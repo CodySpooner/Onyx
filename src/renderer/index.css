@@ -18,3 +18,25 @@ button:hover { background: #26335c; }
 .spacer { flex: 1; }
 .canvas { position: relative; flex: 1; min-height: 0; }
 .canvas canvas { display: block; }
+
+.reader { position: absolute; top: 96px; right: 16px; bottom: 16px; width: 440px; max-width: 46vw;
+  background: rgba(10, 14, 26, 0.92); border: 1px solid #223055; border-radius: 14px; backdrop-filter: blur(8px);
+  display: flex; flex-direction: column; z-index: 4; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.reader-head { display: flex; justify-content: space-between; gap: 8px; padding: 16px; border-bottom: 1px solid #1a2440; }
+.reader-head h2 { font-size: 18px; color: #dfe7ff; }
+.reader-head button { padding: 4px 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #16203c; color: #9fb0dd; }
+.chip.tag { color: #8be9c0; }
+.chip.muted { color: #6d7ca6; }
+.reader-body { padding: 16px; overflow: auto; }
+.reader-body h1, .reader-body h2, .reader-body h3 { margin: 14px 0 6px; color: #dfe7ff; }
+.reader-body p, .reader-body li { color: #c3ccea; }
+.reader-body ul, .reader-body ol { padding-left: 20px; }
+.reader-body a.wikilink { color: #6ea8ff; cursor: pointer; text-decoration: none; border-bottom: 1px dotted #6ea8ff; }
+.reader-body .wikilink.dead { color: #7a6d6d; border: none; cursor: default; }
+.reader-body code { background: #111a30; padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, monospace; }
+.reader-body pre { background: #0b122a; padding: 10px; border-radius: 8px; overflow: auto; }
+.reader-body pre code { background: none; padding: 0; }
+.reader-body blockquote { border-left: 3px solid #33406b; padding-left: 12px; color: #9fb0dd; margin: 8px 0; }
+.muted { color: #6d7ca6; }

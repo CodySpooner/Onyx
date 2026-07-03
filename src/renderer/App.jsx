@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { SpaceCanvas } from './views/SpaceCanvas.jsx'
+import { NoteReader } from './components/NoteReader.jsx'
 
 export default function App() {
   const [graph, setGraph] = useState(null)
@@ -9,6 +10,11 @@ export default function App() {
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
     return window.onyx.onGraphUpdate(setGraph)
+  }, [])
+
+  // ponytail: verification hook so automated screenshots can drive the UI
+  useEffect(() => {
+    window.__onyxDebug = { select: setSelected }
   }, [])
 
   if (!graph) {
@@ -41,6 +47,9 @@ export default function App() {
         <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
       </header>
       <SpaceCanvas view={view} graph={graph} activeIds={null} onSelect={setSelected} />
+      {selected && (
+        <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
+      )}
     </div>
   )
 }

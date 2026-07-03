@@ -55,7 +55,10 @@ function createWindow() {
   })
   if (process.env.ELECTRON_RENDERER_URL) win.loadURL(process.env.ELECTRON_RENDERER_URL)
   else win.loadFile(path.join(__dirname, '../renderer/index.html'))
-  if (process.env.ONYX_SHOT) captureAndQuit(win)
+  if (process.env.ONYX_SHOT) {
+    win.webContents.on('console-message', (_e, _lvl, msg) => console.log('[renderer]', msg))
+    captureAndQuit(win)
+  }
 }
 
 // ponytail: env-gated one-shot screenshot for automated visual verification.
