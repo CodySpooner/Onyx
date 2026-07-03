@@ -35,6 +35,10 @@ button:hover { background: #26335c; }
 .edit-actions .save { background: #2b4d86; color: #eaf3ff; border: 1px solid #3f66a8; }
 .edit-actions .save:hover { background: #345c9e; }
 .edit-hint { color: #566a99; font-size: 10px; margin-left: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reader.editing { width: 760px; max-width: 74vw; }
+.edit-split { display: flex; gap: 10px; flex: 1; min-height: 0; }
+.edit-split textarea { flex: 1; }
+.edit-preview { flex: 1; min-width: 0; overflow: auto; background: #0a0f1e; border: 1px solid #1a2440; border-radius: 8px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #16203c; color: #9fb0dd; }
 .chip.tag { color: #8be9c0; }
@@ -77,6 +81,10 @@ button:hover { background: #26335c; }
 .hud-brand { font-weight: 700; letter-spacing: 3px; color: #cdd8ff; font-size: 14px; }
 .hud-search { background: #0c1226; border: 1px solid #223055; color: #e6ebff; border-radius: 8px; padding: 8px 11px; font-size: 12px; letter-spacing: 0.08em; }
 .hud-search::placeholder { color: #566a99; }
+.hud-new { background: #16234a; color: #cdd8ff; border: 1px solid #2a3a6b; border-radius: 8px; padding: 8px; font-size: 12px; cursor: pointer; letter-spacing: 0.04em; }
+.hud-new:hover { background: #1d2f5e; }
+.rename-input { background: #0c1226; border: 1px solid #3a5c9a; color: #eaf0ff; border-radius: 6px; padding: 4px 8px; font-size: 16px; font-weight: 600; width: 100%; outline: none; }
+.reader-actions .danger:hover { color: #ff9a9a; border-color: #6b2b2b; }
 .hud-sec { display: flex; flex-direction: column; gap: 8px; }
 .sec-h { font-size: 10px; letter-spacing: 0.18em; color: #5f6f9e; }
 

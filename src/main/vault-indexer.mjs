@@ -1,6 +1,13 @@
 import { promises as fs } from 'node:fs'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import matter from 'gray-matter'
+
+const SAFE = /[\\/:*?"<>|#^[\]]/g
+function insideVault(vaultPath, abs) {
+  const rel = path.relative(vaultPath, abs)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('refusing to touch a path outside the vault')
+}
 
 const WIKILINK = /\[\[([^\]]+)\]\]/g
 
@@ -108,7 +115,40 @@ export function readNoteRaw(vaultPath, id) {
 
 export async function writeNoteRaw(vaultPath, id, content) {
   const abs = path.join(vaultPath, id)
-  const rel = path.relative(vaultPath, abs)
-  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('refusing to write outside the vault')
+  insideVault(vaultPath, abs)
   return fs.writeFile(abs, content, 'utf8')
+}
+
+export async function createNote(vaultPath, folder, title) {
+  const base = String(title || 'Untitled').replace(SAFE, '').trim() || 'Untitled'
+  const dir = folder && folder !== '(root)' ? folder : ''
+  let name = base
+  let n = 1
+  while (existsSync(path.join(vaultPath, dir, name + '.md'))) name = `${base} ${++n}`
+  const rel = path.join(dir, name + '.md')
+  const abs = path.join(vaultPath, rel)
+  insideVault(vaultPath, abs)
+  await fs.mkdir(path.dirname(abs), { recursive: true })
+  await fs.writeFile(abs, `---\ntitle: ${name}\n---\n\n`, 'utf8')
+  return rel.split(path.sep).join('/')
+}
+
+export async function deleteNote(vaultPath, id) {
+  const abs = path.join(vaultPath, id)
+  insideVault(vaultPath, abs)
+  return fs.unlink(abs)
+}
+
+export async function renameNote(vaultPath, id, newTitle) {
+  const base = String(newTitle || '').replace(SAFE, '').trim()
+  if (!base) throw new Error('empty title')
+  const dir = path.dirname(id)
+  const rel = path.join(dir === '.' ? '' : dir, base + '.md')
+  const absOld = path.join(vaultPath, id)
+  const absNew = path.join(vaultPath, rel)
+  insideVault(vaultPath, absOld)
+  insideVault(vaultPath, absNew)
+  if (absNew !== absOld && existsSync(absNew)) throw new Error('a note with that name already exists')
+  await fs.rename(absOld, absNew)
+  return rel.split(path.sep).join('/')
 }

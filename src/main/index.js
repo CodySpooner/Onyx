@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
-import { scanVault, readNoteRaw, writeNoteRaw } from './vault-indexer.mjs'
+import { scanVault, readNoteRaw, writeNoteRaw, createNote, deleteNote, renameNote } from './vault-indexer.mjs'
 import { loadConfig, saveConfig } from './config.js'
 import { setupUpdater, installUpdate } from './updater.js'
 
@@ -101,6 +101,34 @@ ipcMain.handle('vault:writeNote', async (_e, id, content) => {
   } catch (e) {
     console.error('writeNote failed:', e)
     return false
+  }
+})
+ipcMain.handle('vault:createNote', async (_e, folder, title) => {
+  const { vaultPath } = loadConfig()
+  try {
+    return await createNote(vaultPath, folder, title)
+  } catch (e) {
+    console.error('createNote failed:', e)
+    return null
+  }
+})
+ipcMain.handle('vault:deleteNote', async (_e, id) => {
+  const { vaultPath } = loadConfig()
+  try {
+    await deleteNote(vaultPath, id)
+    return true
+  } catch (e) {
+    console.error('deleteNote failed:', e)
+    return false
+  }
+})
+ipcMain.handle('vault:renameNote', async (_e, id, title) => {
+  const { vaultPath } = loadConfig()
+  try {
+    return await renameNote(vaultPath, id, title)
+  } catch (e) {
+    console.error('renameNote failed:', e)
+    return null
   }
 })
 ipcMain.handle('config:get', () => loadConfig())

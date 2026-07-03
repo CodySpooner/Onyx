@@ -4,7 +4,7 @@ import { degree, cleanFolder } from '../lib/stats.js'
 
 const uniq = (a) => [...new Set(a.filter(Boolean))].sort()
 
-export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect }) {
+export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate }) {
   const facets = useMemo(
     () => ({
       types: uniq(graph.notes.map((n) => n.type)),
@@ -30,6 +30,10 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect 
         value={filter.q}
         onChange={(e) => onFilter({ ...filter, q: e.target.value })}
       />
+
+      <button className="hud-new" onClick={onCreate}>
+        ＋ New note
+      </button>
 
       <div className="hud-sec vitals">
         <Gauge value={stats.connectedPct} label="LINKED" />

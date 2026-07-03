@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
-import { scanVault, writeNoteRaw, readNoteRaw } from '../src/main/vault-indexer.mjs'
+import { scanVault, writeNoteRaw, readNoteRaw, createNote, deleteNote, renameNote } from '../src/main/vault-indexer.mjs'
 
 const VAULT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixture-vault')
 
@@ -51,6 +51,22 @@ test('writeNoteRaw round-trips content and refuses path traversal', async () => 
     await writeNoteRaw(dir, 'note.md', '# Hi\nedited')
     assert.equal(await readNoteRaw(dir, 'note.md'), '# Hi\nedited')
     await assert.rejects(() => writeNoteRaw(dir, '../escape.md', 'x'))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('createNote / renameNote / deleteNote round-trip; deleteNote refuses to escape', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'onyx-'))
+  try {
+    const id = await createNote(dir, '(root)', 'My New Note')
+    assert.equal(id, 'My New Note.md')
+    assert.equal(await createNote(dir, '(root)', 'My New Note'), 'My New Note 2.md') // dedupes
+    const renamed = await renameNote(dir, id, 'Renamed')
+    assert.equal(renamed, 'Renamed.md')
+    await deleteNote(dir, renamed)
+    await assert.rejects(() => readNoteRaw(dir, 'Renamed.md'))
+    await assert.rejects(() => deleteNote(dir, '../escape.md'))
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

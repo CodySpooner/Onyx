@@ -24,6 +24,8 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [renameVal, setRenameVal] = useState('')
   const ref = useRef(null)
   const note = graph.notes.find((n) => n.id === id)
 
@@ -40,6 +42,7 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
   useEffect(() => {
     setRaw(null)
     setEditing(false)
+    setRenaming(false)
     window.onyx.readNote(id).then(setRaw)
   }, [id])
 
@@ -73,12 +76,44 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
       alert('Could not save the note.')
     }
   }
+  const del = async () => {
+    if (!window.confirm(`Delete "${note?.title || id}"? This removes the file from your vault.`)) return
+    const ok = await window.onyx.deleteNote(id)
+    if (ok) onClose()
+    else alert('Could not delete the note.')
+  }
+  const startRename = () => {
+    setRenameVal(note?.title || id.split('/').pop().replace(/\.md$/, ''))
+    setRenaming(true)
+  }
+  const doRename = async () => {
+    const nid = await window.onyx.renameNote(id, renameVal)
+    setRenaming(false)
+    if (nid && nid !== id) onSelect(nid)
+    else if (!nid) alert('Rename failed — the name may already be taken.')
+  }
 
   return (
-    <aside className="reader">
+    <aside className={`reader ${editing ? 'editing' : ''}`}>
       <div className="reader-head">
         <div>
-          <h2>{note?.title || id}</h2>
+          {renaming ? (
+            <input
+              className="rename-input"
+              value={renameVal}
+              autoFocus
+              onChange={(e) => setRenameVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') doRename()
+                if (e.key === 'Escape') setRenaming(false)
+              }}
+              onBlur={() => setRenaming(false)}
+            />
+          ) : (
+            <h2 onDoubleClick={startRename} title="Double-click to rename">
+              {note?.title || id}
+            </h2>
+          )}
           <div className="chips">
             {note?.type && <span className="chip">{note.type}</span>}
             {note?.status && <span className="chip">{note.status}</span>}
@@ -92,12 +127,21 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
           {!editing && raw != null && (
             <button onClick={startEdit} title="Edit note">✎</button>
           )}
+          {!editing && (
+            <button onClick={del} className="danger" title="Delete note">🗑</button>
+          )}
           <button onClick={onClose} title="Close">✕</button>
         </div>
       </div>
       {editing ? (
         <div className="reader-edit">
-          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} autoFocus />
+          <div className="edit-split">
+            <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} autoFocus />
+            <div
+              className="reader-body edit-preview"
+              dangerouslySetInnerHTML={{ __html: renderBody(draft, basenameToId) }}
+            />
+          </div>
           <div className="edit-actions">
             <button className="save" onClick={save} disabled={saving}>
               {saving ? 'Saving…' : 'Save'}

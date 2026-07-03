@@ -71,6 +71,14 @@ export default function App() {
     setShowLabels(next)
     window.onyx.setConfig({ showLabels: next })
   }
+  const handleCreate = async () => {
+    const folder = filter.folders[0] || '(root)'
+    const id = await window.onyx.createNote(folder, 'Untitled')
+    if (id) {
+      setGraph(await window.onyx.getGraph())
+      setSelected(id)
+    }
+  }
 
   return (
     <div className="app hud">
@@ -92,6 +100,7 @@ export default function App() {
           onFilter={setFilter}
           featured={featured}
           onSelect={setSelected}
+          onCreate={handleCreate}
         />
         <div className="stage">
           <SpaceCanvas
