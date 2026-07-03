@@ -17,6 +17,7 @@ button:hover { background: #26335c; }
 .stats { color: #6d7ca6; font-size: 12px; }
 .spacer { flex: 1; }
 .viewswitch { background: #131c34; color: #cdd8ff; border: 1px solid #26345c; border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+.linktoggle { display: flex; align-items: center; gap: 5px; color: #8ea0c9; font-size: 12px; cursor: pointer; user-select: none; }
 .canvas { position: relative; flex: 1; min-height: 0; }
 .canvas canvas { display: block; }
 

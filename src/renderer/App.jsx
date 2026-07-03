@@ -12,15 +12,20 @@ export default function App() {
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState(EMPTY_FILTER)
   const [view, setView] = useState('solar')
+  const [showAllLinks, setShowAllLinks] = useState(true)
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
     return window.onyx.onGraphUpdate(setGraph)
   }, [])
 
+  useEffect(() => {
+    window.onyx.getConfig().then((c) => setShowAllLinks(c.showAllLinks))
+  }, [])
+
   // ponytail: verification hook so automated screenshots can drive the UI
   useEffect(() => {
-    window.__onyxDebug = { select: setSelected, setFilter, setView }
+    window.__onyxDebug = { select: setSelected, setFilter, setView, setShowAllLinks }
   }, [])
 
   if (!graph) {
@@ -53,11 +58,29 @@ export default function App() {
           {graph.meta.noteCount} notes · {graph.meta.linkCount} links
         </span>
         <div className="spacer" />
+        <label className="linktoggle">
+          <input
+            type="checkbox"
+            checked={showAllLinks}
+            onChange={() => {
+              const next = !showAllLinks
+              setShowAllLinks(next)
+              window.onyx.setConfig({ showAllLinks: next })
+            }}
+          />
+          links
+        </label>
         <ViewSwitcher view={view} onChange={setView} />
         <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
       </header>
       <SearchFilter graph={graph} filter={filter} onChange={setFilter} />
-      <SpaceCanvas view={view} graph={graph} activeIds={filtering ? activeIds : null} onSelect={setSelected} />
+      <SpaceCanvas
+        view={view}
+        graph={graph}
+        activeIds={filtering ? activeIds : null}
+        onSelect={setSelected}
+        showAllLinks={showAllLinks}
+      />
       {selected && (
         <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
       )}
