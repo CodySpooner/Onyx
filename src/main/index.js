@@ -29,8 +29,12 @@ function captureAndQuit(win) {
   win.webContents.once('did-finish-load', () => {
     setTimeout(async () => {
       try {
+        const { readFileSync, writeFileSync } = await import('node:fs')
+        if (process.env.ONYX_SHOT_JS) {
+          await win.webContents.executeJavaScript(readFileSync(process.env.ONYX_SHOT_JS, 'utf8'))
+          await new Promise((r) => setTimeout(r, 700)) // let the UI react
+        }
         const img = await win.webContents.capturePage()
-        const { writeFileSync } = await import('node:fs')
         writeFileSync(process.env.ONYX_SHOT, img.toPNG())
       } catch (e) {
         console.error('ONYX_SHOT capture failed:', e)
