@@ -3,6 +3,7 @@ import { matchFilter } from './lib/graph.mjs'
 import { SpaceCanvas } from './views/SpaceCanvas.jsx'
 import { NoteReader } from './components/NoteReader.jsx'
 import { SearchFilter } from './components/SearchFilter.jsx'
+import { ViewSwitcher } from './views/ViewSwitcher.jsx'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -10,7 +11,7 @@ export default function App() {
   const [graph, setGraph] = useState(null)
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState(EMPTY_FILTER)
-  const [view] = useState('solar')
+  const [view, setView] = useState('solar')
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
@@ -19,7 +20,7 @@ export default function App() {
 
   // ponytail: verification hook so automated screenshots can drive the UI
   useEffect(() => {
-    window.__onyxDebug = { select: setSelected, setFilter }
+    window.__onyxDebug = { select: setSelected, setFilter, setView }
   }, [])
 
   if (!graph) {
@@ -52,6 +53,7 @@ export default function App() {
           {graph.meta.noteCount} notes · {graph.meta.linkCount} links
         </span>
         <div className="spacer" />
+        <ViewSwitcher view={view} onChange={setView} />
         <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
       </header>
       <SearchFilter graph={graph} filter={filter} onChange={setFilter} />

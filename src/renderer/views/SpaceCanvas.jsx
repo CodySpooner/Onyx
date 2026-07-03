@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { SolarSystemView } from './SolarSystemView.js'
+import { GraphView } from './GraphView.js'
 
-// GraphView (constellation) is added to this map in Task 8.
-const VIEWS = { solar: SolarSystemView }
+const VIEWS = { solar: SolarSystemView, constellation: GraphView }
 
 export function SpaceCanvas({ view, graph, activeIds, onSelect, showAllLinks = true }) {
   const ref = useRef(null)
