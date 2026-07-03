@@ -1,8 +1,43 @@
+import { useEffect, useState } from 'react'
+
 export default function App() {
+  const [graph, setGraph] = useState(null)
+
+  useEffect(() => {
+    window.onyx.getGraph().then(setGraph)
+    return window.onyx.onGraphUpdate(setGraph)
+  }, [])
+
+  if (!graph) {
+    return (
+      <div className="empty">
+        <h1>◑ Onyx</h1>
+        <p>loading vault…</p>
+      </div>
+    )
+  }
+
+  if (!graph.notes.length) {
+    return (
+      <div className="empty">
+        <h1>◑ Onyx</h1>
+        <p>No notes found in this folder.</p>
+        <button onClick={() => window.onyx.pickVault().then(setGraph)}>Choose vault folder</button>
+      </div>
+    )
+  }
+
   return (
-    <div className="empty">
-      <h1>◑ Onyx</h1>
-      <p>booting…</p>
+    <div className="app">
+      <header className="topbar">
+        <span className="brand">◑ Onyx</span>
+        <span className="stats">
+          {graph.meta.noteCount} notes · {graph.meta.linkCount} links
+        </span>
+        <div className="spacer" />
+        <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
+      </header>
+      <div className="canvas" />
     </div>
   )
 }
