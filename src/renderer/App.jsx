@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
+import { SpaceCanvas } from './views/SpaceCanvas.jsx'
 
 export default function App() {
   const [graph, setGraph] = useState(null)
+  const [selected, setSelected] = useState(null)
+  const [view] = useState('solar')
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
@@ -37,7 +40,7 @@ export default function App() {
         <div className="spacer" />
         <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
       </header>
-      <div className="canvas" />
+      <SpaceCanvas view={view} graph={graph} activeIds={null} onSelect={setSelected} />
     </div>
   )
 }

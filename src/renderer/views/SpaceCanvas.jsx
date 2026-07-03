@@ -1,0 +1,38 @@
+import { useEffect, useRef } from 'react'
+import { SolarSystemView } from './SolarSystemView.js'
+
+// GraphView (constellation) is added to this map in Task 8.
+const VIEWS = { solar: SolarSystemView }
+
+export function SpaceCanvas({ view, graph, activeIds, onSelect, showAllLinks = true }) {
+  const ref = useRef(null)
+  const inst = useRef(null)
+
+  useEffect(() => {
+    const View = VIEWS[view] || SolarSystemView
+    inst.current = new View(ref.current, { onSelect })
+    inst.current.update(graph)
+    inst.current.setActive(activeIds)
+    inst.current.setLinksMode?.(showAllLinks)
+    return () => {
+      inst.current?.dispose()
+      inst.current = null
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view])
+
+  useEffect(() => {
+    inst.current?.update(graph)
+    inst.current?.setActive(activeIds)
+  }, [graph])
+
+  useEffect(() => {
+    inst.current?.setActive(activeIds)
+  }, [activeIds])
+
+  useEffect(() => {
+    inst.current?.setLinksMode?.(showAllLinks)
+  }, [showAllLinks])
+
+  return <div className="canvas" ref={ref} />
+}
