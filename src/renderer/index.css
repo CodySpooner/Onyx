@@ -40,3 +40,11 @@ button:hover { background: #26335c; }
 .reader-body pre code { background: none; padding: 0; }
 .reader-body blockquote { border-left: 3px solid #33406b; padding-left: 12px; color: #9fb0dd; margin: 8px 0; }
 .muted { color: #6d7ca6; }
+
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 16px; border-bottom: 1px solid #141c33; max-height: 96px; overflow-y: auto; position: relative; z-index: 3; }
+.search { background: #0d1428; border: 1px solid #26345c; color: #e6ebff; border-radius: 8px; padding: 7px 12px; width: 240px; }
+.search::placeholder { color: #5a6a95; }
+.facet { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip.toggle { background: #131c34; color: #8ea0c9; border: 1px solid #223055; font-size: 11px; padding: 3px 9px; border-radius: 999px; cursor: pointer; }
+.chip.toggle.on { background: #2b3d70; color: #dfe7ff; border-color: #4a63a8; }
+.chip.clear { background: transparent; color: #ff9a9a; border: none; cursor: pointer; }

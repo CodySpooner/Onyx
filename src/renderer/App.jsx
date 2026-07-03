@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
+import { matchFilter } from './lib/graph.mjs'
 import { SpaceCanvas } from './views/SpaceCanvas.jsx'
 import { NoteReader } from './components/NoteReader.jsx'
+import { SearchFilter } from './components/SearchFilter.jsx'
+
+const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
 export default function App() {
   const [graph, setGraph] = useState(null)
   const [selected, setSelected] = useState(null)
+  const [filter, setFilter] = useState(EMPTY_FILTER)
   const [view] = useState('solar')
 
   useEffect(() => {
@@ -14,7 +19,7 @@ export default function App() {
 
   // ponytail: verification hook so automated screenshots can drive the UI
   useEffect(() => {
-    window.__onyxDebug = { select: setSelected }
+    window.__onyxDebug = { select: setSelected, setFilter }
   }, [])
 
   if (!graph) {
@@ -36,6 +41,9 @@ export default function App() {
     )
   }
 
+  const activeIds = new Set(graph.notes.filter((n) => matchFilter(n, filter)).map((n) => n.id))
+  const filtering = activeIds.size !== graph.notes.length
+
   return (
     <div className="app">
       <header className="topbar">
@@ -46,7 +54,8 @@ export default function App() {
         <div className="spacer" />
         <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
       </header>
-      <SpaceCanvas view={view} graph={graph} activeIds={null} onSelect={setSelected} />
+      <SearchFilter graph={graph} filter={filter} onChange={setFilter} />
+      <SpaceCanvas view={view} graph={graph} activeIds={filtering ? activeIds : null} onSelect={setSelected} />
       {selected && (
         <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
       )}
