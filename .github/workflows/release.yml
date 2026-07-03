@@ -24,3 +24,18 @@ jobs:
       - run: npm run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # electron-builder's publisher can drop the large .exe upload; re-attach the
+      # updater-critical assets with gh (robust for big files) so the release is complete.
+      - name: Ensure installer + update metadata are attached
+        if: always()
+        shell: bash
+        run: |
+          TAG="${{ github.ref_name }}"
+          V="${TAG#v}"
+          gh release upload "$TAG" \
+            "release/Onyx Setup ${V}.exe" \
+            "release/Onyx Setup ${V}.exe.blockmap" \
+            "release/latest.yml" \
+            --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
