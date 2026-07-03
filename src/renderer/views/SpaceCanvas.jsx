@@ -6,7 +6,7 @@ import { GlobeView } from './GlobeView.js'
 
 const VIEWS = { solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
 
-export function SpaceCanvas({ view, graph, activeIds, onSelect, showAllLinks = true, showLabels = false }) {
+export function SpaceCanvas({ view, graph, activeIds, onSelect, showAllLinks = true, showLabels = false, resetNonce = 0 }) {
   const ref = useRef(null)
   const inst = useRef(null)
 
@@ -22,7 +22,7 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, showAllLinks = t
       inst.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view])
+  }, [view, resetNonce])
 
   useEffect(() => {
     inst.current?.update(graph)

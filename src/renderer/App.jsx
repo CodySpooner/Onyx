@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import { matchFilter } from './lib/graph.mjs'
+import { vaultStats } from './lib/stats.js'
 import { SpaceCanvas } from './views/SpaceCanvas.jsx'
-import { NoteReader } from './components/NoteReader.jsx'
-import { SearchFilter } from './components/SearchFilter.jsx'
 import { ViewSwitcher } from './views/ViewSwitcher.jsx'
+import { NoteReader } from './components/NoteReader.jsx'
+import { HudSidebar } from './components/HudSidebar.jsx'
+import { FolderTabs } from './components/FolderTabs.jsx'
+import { HudToolbar } from './components/HudToolbar.jsx'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -14,6 +17,7 @@ export default function App() {
   const [view, setView] = useState('solar')
   const [showAllLinks, setShowAllLinks] = useState(true)
   const [showLabels, setShowLabels] = useState(false)
+  const [resetNonce, setResetNonce] = useState(0)
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
@@ -53,51 +57,60 @@ export default function App() {
 
   const activeIds = new Set(graph.notes.filter((n) => matchFilter(n, filter)).map((n) => n.id))
   const filtering = activeIds.size !== graph.notes.length
+  const stats = vaultStats(graph)
+  const featured = graph.notes.find((n) => n.id === selected) || stats.hubs[0]
+
+  const toggleLinks = () => {
+    const next = !showAllLinks
+    setShowAllLinks(next)
+    window.onyx.setConfig({ showAllLinks: next })
+  }
+  const toggleLabels = () => {
+    const next = !showLabels
+    setShowLabels(next)
+    window.onyx.setConfig({ showLabels: next })
+  }
 
   return (
-    <div className="app">
+    <div className="app hud">
       <header className="topbar">
         <span className="brand">◑ Onyx</span>
         <span className="stats">
           {graph.meta.noteCount} notes · {graph.meta.linkCount} links
         </span>
         <div className="spacer" />
-        <label className="linktoggle">
-          <input
-            type="checkbox"
-            checked={showAllLinks}
-            onChange={() => {
-              const next = !showAllLinks
-              setShowAllLinks(next)
-              window.onyx.setConfig({ showAllLinks: next })
-            }}
-          />
-          links
-        </label>
-        <label className="linktoggle">
-          <input
-            type="checkbox"
-            checked={showLabels}
-            onChange={() => {
-              const next = !showLabels
-              setShowLabels(next)
-              window.onyx.setConfig({ showLabels: next })
-            }}
-          />
-          labels
-        </label>
         <ViewSwitcher view={view} onChange={setView} />
         <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
       </header>
-      <SearchFilter graph={graph} filter={filter} onChange={setFilter} />
-      <SpaceCanvas
-        view={view}
-        graph={graph}
-        activeIds={filtering ? activeIds : null}
-        onSelect={setSelected}
-        showAllLinks={showAllLinks}
-        showLabels={showLabels}
-      />
+      <FolderTabs graph={graph} filter={filter} onChange={setFilter} />
+      <div className="hud-body">
+        <HudSidebar
+          graph={graph}
+          stats={stats}
+          filter={filter}
+          onFilter={setFilter}
+          featured={featured}
+          onSelect={setSelected}
+        />
+        <div className="stage">
+          <SpaceCanvas
+            view={view}
+            graph={graph}
+            activeIds={filtering ? activeIds : null}
+            onSelect={setSelected}
+            showAllLinks={showAllLinks}
+            showLabels={showLabels}
+            resetNonce={resetNonce}
+          />
+        </div>
+        <HudToolbar
+          showAllLinks={showAllLinks}
+          onLinks={toggleLinks}
+          showLabels={showLabels}
+          onLabels={toggleLabels}
+          onReset={() => setResetNonce((n) => n + 1)}
+        />
+      </div>
       {selected && (
         <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
       )}
