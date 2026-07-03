@@ -4,25 +4,30 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { hashAngle } from '../lib/graph.mjs'
+import { makeOrb, addLights, makeStarfield, makeNebula } from '../lib/scenery.js'
 
-const FOLDER_RING = 74 // radius of the ring the suns sit on
+const FOLDER_RING = 74
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 export class SolarSystemView {
   constructor(container, { onSelect }) {
     this.container = container
     this.onSelect = onSelect
-    this.planets = [] // { mesh, note, sun, orbitR, speed, phase, baseColor, size }
-    this.suns = new Map() // folderId → { mesh, pos, color }
+    this.planets = []
+    this.suns = new Map()
     this.activeIds = null
     this.hovered = null
     this.showAllLinks = true
+    this._t = 0
 
     const w = container.clientWidth || 1400
     const h = container.clientHeight || 800
 
     this.scene = new THREE.Scene()
-    this.scene.fog = new THREE.FogExp2(0x05060a, 0.0022)
+    this.scene.fog = new THREE.FogExp2(0x05060a, 0.002)
+    this.scene.add(makeNebula('#1e2456', '#0a1c44'))
+    this.scene.add(makeStarfield())
+    addLights(this.scene)
 
     this.camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 3000)
     this.camera.position.set(0, 82, 168)
@@ -38,10 +43,9 @@ export class SolarSystemView {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.9, 0.5, 0.15)
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.9, 0.5, 0.12)
     this.composer.addPass(this.bloom)
 
-    this.scene.add(this._starfield())
     this.linkGroup = new THREE.Group()
     this.scene.add(this.linkGroup)
 
@@ -59,25 +63,6 @@ export class SolarSystemView {
     this._loop()
   }
 
-  _starfield() {
-    const g = new THREE.BufferGeometry()
-    const n = 1800
-    const pos = new Float32Array(n * 3)
-    for (let i = 0; i < n; i++) {
-      const r = 380 + (i % 400)
-      const a = hashAngle(`star${i}`)
-      const b = hashAngle(`b${i}`)
-      pos[i * 3] = Math.cos(a) * r
-      pos[i * 3 + 1] = (Math.sin(b) - 0.5) * 320
-      pos[i * 3 + 2] = Math.sin(a) * r
-    }
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    return new THREE.Points(
-      g,
-      new THREE.PointsMaterial({ color: 0x8899cc, size: 1.1, transparent: true, opacity: 0.7 })
-    )
-  }
-
   update(graph) {
     this.graph = graph
     this._clearScene()
@@ -87,14 +72,17 @@ export class SolarSystemView {
       const ang = (i / folders.length) * Math.PI * 2
       const pos = new THREE.Vector3(Math.cos(ang) * FOLDER_RING, 0, Math.sin(ang) * FOLDER_RING)
       const color = new THREE.Color(f.color)
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(3.0, 24, 24),
-        new THREE.MeshBasicMaterial({ color })
-      )
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(3.0, 24, 24), new THREE.MeshBasicMaterial({ color }))
       mesh.position.copy(pos)
       mesh.userData = { sunFolder: f.id }
       this.scene.add(mesh)
-      this.suns.set(f.id, { mesh, pos, color })
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(5.4, 20, 20),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
+      )
+      halo.position.copy(pos)
+      this.scene.add(halo)
+      this.suns.set(f.id, { mesh, halo, pos, color })
     })
 
     const perFolder = new Map()
@@ -105,22 +93,19 @@ export class SolarSystemView {
       perFolder.set(note.folder, k + 1)
       const orbitR = 4 + (k % 4) * 1.7 + k / 20
       const links = note.outLinks.length + note.inLinks.length
-      const size = clamp(0.4 + links * 0.12, 0.4, 2.2)
-      const mesh = new THREE.Mesh(
-        new THREE.SphereGeometry(size, 16, 16),
-        new THREE.MeshBasicMaterial({ color: sun.color })
-      )
-      mesh.userData = { id: note.id }
-      this.scene.add(mesh)
+      const size = clamp(0.5 + links * 0.12, 0.5, 2.3)
+      const orb = makeOrb(sun.color, size, note.type, note.id)
+      this.scene.add(orb.mesh)
       this.planets.push({
-        mesh,
+        ...orb,
         note,
         sun,
         orbitR,
         speed: 0.15 + (k % 5) * 0.03,
         phase: hashAngle(note.id),
         baseColor: sun.color.clone(),
-        size
+        baseSize: size,
+        active: true
       })
     })
 
@@ -143,13 +128,7 @@ export class SolarSystemView {
     this.linkGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(coords), 3))
     this.lines = new THREE.LineSegments(
       this.linkGeo,
-      new THREE.LineBasicMaterial({
-        color: 0x66ccff,
-        transparent: true,
-        opacity: 0.14,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false
-      })
+      new THREE.LineBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false })
     )
     this.linkGroup.add(this.lines)
   }
@@ -158,10 +137,10 @@ export class SolarSystemView {
     this.activeIds = idSet
     for (const p of this.planets) {
       const on = !idSet || idSet.has(p.note.id)
-      p.mesh.material.color.copy(p.baseColor)
+      p.active = on
       p.mesh.material.transparent = !on
-      p.mesh.material.opacity = on ? 1 : 0.12
-      p.mesh.scale.setScalar(on ? 1 : 0.6)
+      p.mesh.material.opacity = on ? 1 : 0.14
+      p.mesh.material.emissiveIntensity = on ? 0.9 : 0.3
     }
   }
 
@@ -171,7 +150,7 @@ export class SolarSystemView {
   }
 
   _positions() {
-    const t = this.clock.getElapsedTime()
+    const t = this._t
     for (const p of this.planets) {
       const a = p.phase + t * p.speed
       p.mesh.position.set(
@@ -179,6 +158,10 @@ export class SolarSystemView {
         p.sun.pos.y + Math.sin(a * 0.6) * 1.5,
         p.sun.pos.z + Math.sin(a) * p.orbitR
       )
+      p.mesh.rotation.x += p.spinX
+      p.mesh.rotation.y += p.spinY
+      const pulse = 1 + Math.sin(t * 1.5 + p.pulse) * 0.07
+      p.mesh.scale.setScalar(p.baseSize * pulse * (p.active ? 1 : 0.55))
     }
   }
 
@@ -231,16 +214,17 @@ export class SolarSystemView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
+    this._t += Math.min(0.05, this.clock.getDelta())
     this._positions()
     this._updateLinks()
     if (this._flight) {
       this._flight.t = Math.min(1, this._flight.t + 0.02)
-      const k = this._flight.t * (2 - this._flight.t) // ease-out
+      const k = this._flight.t * (2 - this._flight.t)
       this.camera.position.lerpVectors(this._flight.from, this._flight.to, k)
       this.controls.target.lerp(this._flight.look, k)
       if (this._flight.t >= 1) this._flight = null
     }
-    const pulse = 1 + Math.sin(this.clock.elapsedTime * 2) * 0.04
+    const pulse = 1 + Math.sin(this._t * 2) * 0.04
     for (const [, s] of this.suns) s.mesh.scale.setScalar(pulse)
     if (this.lines) {
       const base = this.showAllLinks ? 0.14 : 0.0
@@ -253,13 +237,16 @@ export class SolarSystemView {
   _clearScene() {
     for (const p of this.planets) {
       this.scene.remove(p.mesh)
-      p.mesh.geometry.dispose()
+      if (!p.mesh.userData?.sharedGeo) p.mesh.geometry.dispose()
       p.mesh.material.dispose()
     }
     for (const [, s] of this.suns) {
       this.scene.remove(s.mesh)
+      this.scene.remove(s.halo)
       s.mesh.geometry.dispose()
       s.mesh.material.dispose()
+      s.halo.geometry.dispose()
+      s.halo.material.dispose()
     }
     this.planets = []
     this.suns = new Map()
