@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { SolarSystemView } from './SolarSystemView.js'
 import { GraphView } from './GraphView.js'
+import { CoreView } from './CoreView.js'
 
-const VIEWS = { solar: SolarSystemView, constellation: GraphView }
+const VIEWS = { solar: SolarSystemView, constellation: GraphView, core: CoreView }
 
 export function SpaceCanvas({ view, graph, activeIds, onSelect, showAllLinks = true }) {
   const ref = useRef(null)

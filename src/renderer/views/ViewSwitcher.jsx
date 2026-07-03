@@ -1,5 +1,6 @@
 const VIEWS = [
   { id: 'solar', label: '☀ Solar System' },
+  { id: 'core', label: '◉ Core of Everything' },
   { id: 'constellation', label: '✦ Constellation' }
 ]
 
