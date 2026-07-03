@@ -9,11 +9,18 @@
     "build": "electron-vite build",
     "start": "electron-vite preview",
     "test": "node --test",
-    "dist": "electron-vite build && electron-builder"
+    "dist": "electron-vite build && electron-builder",
+    "release": "electron-vite build && electron-builder --publish always"
   },
   "build": {
     "appId": "com.cody.onyx",
     "productName": "Onyx",
+    "publish": {
+      "provider": "github",
+      "owner": "CodySpooner",
+      "repo": "Onyx",
+      "releaseType": "release"
+    },
     "directories": {
       "output": "release",
       "buildResources": "build"

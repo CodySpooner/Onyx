@@ -44,6 +44,28 @@ npm test
 Covers the vault indexer (scan, frontmatter, wikilink resolution) and the filter
 logic.
 
+## Package a Windows app
+
+```
+npm run dist
+```
+
+Builds `release/Onyx Setup <version>.exe` (NSIS installer + desktop shortcut) and
+a portable `release/win-unpacked/Onyx.exe`. The app icon is generated from
+`pictures/icon.png` by `node scripts/make-icon.cjs`.
+
+## Releasing (automated)
+
+Bump the version and push a tag — GitHub Actions builds the installer on a
+Windows runner and publishes it to a new Release automatically:
+
+```
+npm version patch        # bumps package.json, commits, tags vX.Y.Z
+git push --follow-tags
+```
+
+See `.github/workflows/release.yml` (triggered by any `v*` tag).
+
 ## Stack
 
 Electron · electron-vite · React · Three.js · markdown-it · gray-matter ·

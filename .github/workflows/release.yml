@@ -1,0 +1,26 @@
+name: Release
+
+# Push a version tag (e.g. v0.1.1) and GitHub builds the Windows installer
+# and publishes it to a new Release automatically.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # allows the workflow to create the GitHub Release
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
