@@ -5,9 +5,8 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { makeLabel } from '../lib/label.js'
+import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs } from '../lib/scenery.js'
 
-// "Second brain" globe: notes on nested spherical shells around a bright core,
-// radial lines to the core, wikilink chords, an equator + great-circle rings.
 const R = 48
 const GOLDEN = Math.PI * (3 - Math.sqrt(5))
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -21,12 +20,16 @@ export class GlobeView {
     this.labelsVisible = true
     this.activeIds = null
     this.showLinks = true
+    this._t = 0
 
     const w = container.clientWidth || 1400
     const h = container.clientHeight || 800
 
     this.scene = new THREE.Scene()
-    this.scene.fog = new THREE.FogExp2(0x05040a, 0.0016)
+    this.scene.fog = new THREE.FogExp2(0x05040a, 0.0015)
+    this.scene.add(makeNebula('#3a1f5e', '#0e2148'))
+    this.scene.add(makeStarfield())
+    addLights(this.scene)
 
     this.camera = new THREE.PerspectiveCamera(52, w / h, 0.1, 3000)
     this.camera.position.set(0, 26, 158)
@@ -42,10 +45,9 @@ export class GlobeView {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 1.05, 0.6, 0.08)
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 1.0, 0.62, 0.06)
     this.composer.addPass(this.bloom)
 
-    this.scene.add(this._starfield())
     this.group = new THREE.Group()
     this.scene.add(this.group)
 
@@ -61,22 +63,6 @@ export class GlobeView {
     this.clock = new THREE.Clock()
     this._raf = null
     this._loop()
-  }
-
-  _starfield() {
-    const g = new THREE.BufferGeometry()
-    const n = 1600
-    const pos = new Float32Array(n * 3)
-    for (let i = 0; i < n; i++) {
-      const r = 420 + (i % 380)
-      const a = hashAngle(`star${i}`)
-      const b = hashAngle(`b${i}`)
-      pos[i * 3] = Math.cos(a) * r
-      pos[i * 3 + 1] = (Math.sin(b) - 0.5) * 340
-      pos[i * 3 + 2] = Math.sin(a) * r
-    }
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
-    return new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9a8ad0, size: 1.0, transparent: true, opacity: 0.65 }))
   }
 
   _ring(radius, rotX, rotZ, color, opacity) {
@@ -97,21 +83,21 @@ export class GlobeView {
     this.graph = graph
     this._clear()
 
-    // pink-white core
-    this.core = new THREE.Mesh(new THREE.SphereGeometry(3.6, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffe6f2 }))
+    // bright pink core with layered halos
+    this.core = new THREE.Mesh(new THREE.SphereGeometry(3.8, 32, 32), new THREE.MeshBasicMaterial({ color: 0xfff0f8 }))
     this.group.add(this.core)
-    const halo = new THREE.Mesh(
-      new THREE.SphereGeometry(7, 32, 32),
-      new THREE.MeshBasicMaterial({ color: 0xff7bd0, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false })
-    )
-    this.group.add(halo)
+    for (const [r, c, o] of [[6.5, 0xff7bd0, 0.22], [11, 0xa25bff, 0.1]]) {
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(r, 24, 24),
+        new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false })
+      )
+      this.group.add(halo)
+    }
 
-    // rings: equator + two tilted great circles
-    this.group.add(this._ring(R + 3, 0, 0, 0x3a4676, 0.5))
-    this.group.add(this._ring(R + 3, Math.PI / 2.4, 0, 0x2c2350, 0.35))
-    this.group.add(this._ring(R + 3, Math.PI / 2.4, Math.PI / 2, 0x2c2350, 0.35))
+    this.group.add(this._ring(R + 3, 0, 0, 0x4a5690, 0.55))
+    this.group.add(this._ring(R + 3, Math.PI / 2.4, 0, 0x3a2f66, 0.4))
+    this.group.add(this._ring(R + 3, Math.PI / 2.4, Math.PI / 2, 0x3a2f66, 0.4))
 
-    // nodes on a fibonacci sphere with slight per-node shell variation
     const N = graph.notes.length
     const pos = new Map()
     const radial = []
@@ -119,36 +105,36 @@ export class GlobeView {
       const y = 1 - (i / Math.max(1, N - 1)) * 2
       const rad = Math.sqrt(Math.max(0, 1 - y * y))
       const theta = GOLDEN * i
-      const shell = R * (0.82 + hashAngle('s' + note.id) * (0.18 / (Math.PI * 2)))
+      const shell = R * (0.82 + (hashAngle('s' + note.id) / (Math.PI * 2)) * 0.18)
       const p = new THREE.Vector3(Math.cos(theta) * rad, y, Math.sin(theta) * rad).multiplyScalar(shell)
       pos.set(note.id, p)
       const folder = graph.folders.find((f) => f.id === note.folder)
-      const color = new THREE.Color(folder?.color || '#c9a2ff')
       const links = note.outLinks.length + note.inLinks.length
-      const size = clamp(0.5 + links * 0.11, 0.5, 2.2)
-      const mesh = new THREE.Mesh(new THREE.SphereGeometry(size, 14, 14), new THREE.MeshBasicMaterial({ color }))
-      mesh.position.copy(p)
-      mesh.userData = { id: note.id }
-      this.group.add(mesh)
-      this.nodes.push({ mesh, id: note.id, baseColor: color.clone() })
+      const size = clamp(0.6 + links * 0.12, 0.6, 2.5)
+      const orb = makeOrb(folder?.color || '#c9a2ff', size, note.type, note.id)
+      orb.mesh.position.copy(p)
+      this.group.add(orb.mesh)
+      this.nodes.push({ ...orb, id: note.id, baseColor: new THREE.Color(folder?.color || '#c9a2ff'), baseSize: size, active: true })
+      radial.push(0, 0, 0, p.x, p.y, p.z)
+
       const label = makeLabel(note.title, '#eef2ff', 0.045)
-      label.position.set(p.x, p.y + size + 1.3, p.z)
+      label.position.set(p.x, p.y + size + 1.4, p.z)
       this.group.add(label)
       this.labels.push({ sprite: label, id: note.id })
-      radial.push(0, 0, 0, p.x, p.y, p.z)
     })
 
-    // radial lines core -> node (structural, always shown)
+    // faint radial lines + energy pulses flowing outward from the core
     const radialGeo = new THREE.BufferGeometry()
     radialGeo.setAttribute('position', new THREE.Float32BufferAttribute(radial, 3))
     this.group.add(
       new THREE.LineSegments(
         radialGeo,
-        new THREE.LineBasicMaterial({ color: 0xff9ad8, transparent: true, opacity: 0.07, blending: THREE.AdditiveBlending, depthWrite: false })
+        new THREE.LineBasicMaterial({ color: 0xff9ad8, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false })
       )
     )
+    this.pulses = new LinkPulses(this.group, radial, 0xffb0e6, 80)
 
-    // wikilink chords (toggled by the links checkbox)
+    // wikilink chords (toggled)
     const chord = []
     for (const l of graph.links) {
       const a = pos.get(l.source)
@@ -159,7 +145,7 @@ export class GlobeView {
     chordGeo.setAttribute('position', new THREE.Float32BufferAttribute(chord, 3))
     this.links = new THREE.LineSegments(
       chordGeo,
-      new THREE.LineBasicMaterial({ color: 0x7fbfff, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false })
+      new THREE.LineBasicMaterial({ color: 0x7fbfff, transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending, depthWrite: false })
     )
     this.links.visible = this.showLinks
     this.group.add(this.links)
@@ -171,10 +157,10 @@ export class GlobeView {
     this.activeIds = idSet
     for (const n of this.nodes) {
       const on = !idSet || idSet.has(n.id)
-      n.mesh.material.color.copy(n.baseColor)
+      n.active = on
       n.mesh.material.transparent = !on
-      n.mesh.material.opacity = on ? 1 : 0.12
-      n.mesh.scale.setScalar(on ? 1 : 0.6)
+      n.mesh.material.opacity = on ? 1 : 0.14
+      n.mesh.material.emissiveIntensity = on ? 0.9 : 0.3
     }
   }
 
@@ -224,8 +210,12 @@ export class GlobeView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
+    const dt = Math.min(0.05, this.clock.getDelta())
+    this._t += dt
     this.group.rotation.y += 0.0011
-    const pulse = 1 + Math.sin(this.clock.getElapsedTime() * 1.8) * 0.06
+    animateOrbs(this.nodes, this._t, dt)
+    if (this.pulses) this.pulses.update(dt)
+    const pulse = 1 + Math.sin(this._t * 1.8) * 0.06
     if (this.core) this.core.scale.setScalar(pulse)
     this._fadeLabels(112, 210)
     this.controls.update()
@@ -233,10 +223,14 @@ export class GlobeView {
   }
 
   _clear() {
+    if (this.pulses) {
+      this.pulses.dispose()
+      this.pulses = null
+    }
     for (const child of [...this.group.children]) {
       this.group.remove(child)
-      child.geometry?.dispose()
       child.material?.dispose()
+      if (!child.userData?.sharedGeo) child.geometry?.dispose()
     }
     this.nodes = []
     this.labels = []
