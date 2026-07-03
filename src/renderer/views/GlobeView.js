@@ -132,7 +132,7 @@ export class GlobeView {
         new THREE.LineBasicMaterial({ color: 0xff9ad8, transparent: true, opacity: 0.05, blending: THREE.AdditiveBlending, depthWrite: false })
       )
     )
-    this.pulses = new LinkPulses(this.group, radial, 0xffb0e6, 80)
+    this.pulses = new LinkPulses(this.group, radial, 0xffb0e6, 120)
 
     // wikilink chords (toggled)
     const chord = []

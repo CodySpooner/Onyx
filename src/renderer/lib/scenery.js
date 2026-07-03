@@ -124,14 +124,17 @@ export function makeNebula(hexA = '#2a1a4d', hexB = '#0a1836') {
   ctx.fillStyle = '#05060c'
   ctx.fillRect(0, 0, s, s)
   const blobs = [
-    [s * 0.3, s * 0.4, hexA],
-    [s * 0.7, s * 0.65, hexB],
-    [s * 0.55, s * 0.25, hexB],
-    [s * 0.2, s * 0.75, hexA]
+    [s * 0.3, s * 0.4, hexA, 0.44],
+    [s * 0.7, s * 0.65, hexB, 0.42],
+    [s * 0.55, s * 0.22, hexB, 0.32],
+    [s * 0.18, s * 0.75, hexA, 0.34],
+    [s * 0.82, s * 0.32, hexA, 0.3],
+    [s * 0.46, s * 0.58, hexB, 0.26]
   ]
-  for (const [x, y, col] of blobs) {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, s * 0.42)
-    g.addColorStop(0, col + '66')
+  const hex2 = (a) => Math.round(a * 255).toString(16).padStart(2, '0')
+  for (const [x, y, col, alpha] of blobs) {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, s * 0.4)
+    g.addColorStop(0, col + hex2(alpha))
     g.addColorStop(1, col + '00')
     ctx.fillStyle = g
     ctx.fillRect(0, 0, s, s)
@@ -163,7 +166,7 @@ export class LinkPulses {
       geo,
       new THREE.PointsMaterial({
         color: new THREE.Color(colorHex),
-        size: 2.6,
+        size: 3.2,
         map: softDot(),
         transparent: true,
         opacity: 0.95,

@@ -137,7 +137,7 @@ export class CoreView {
       new THREE.LineBasicMaterial({ color: 0xbcd2ff, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false })
     )
     this.group.add(this.fan)
-    this.pulses = new LinkPulses(this.group, fanPts, 0xcfe0ff, 80)
+    this.pulses = new LinkPulses(this.group, fanPts, 0xcfe0ff, 120)
 
     this.setActive(this.activeIds)
   }
