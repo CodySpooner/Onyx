@@ -105,3 +105,20 @@ button:hover { background: #26335c; }
 .tbtn.on { color: #8fd0ff; border-color: #3a5c9a; background: #14224a; }
 
 .reader { right: 62px; }
+
+/* ── update toast ───────────────────────────────────────────── */
+.update-toast { position: absolute; right: 72px; bottom: 20px; width: 300px; display: flex; gap: 11px; align-items: flex-start; background: rgba(12, 16, 30, 0.96); border: 1px solid #2a3a6b; border-radius: 12px; padding: 13px 14px; z-index: 20; box-shadow: 0 16px 50px rgba(0, 0, 0, 0.55); backdrop-filter: blur(8px); }
+.update-toast.ready { border-color: #3a6ba8; }
+.ut-dot { width: 9px; height: 9px; border-radius: 50%; background: #6ea8ff; margin-top: 4px; flex: none; box-shadow: 0 0 8px #6ea8ff; }
+.ut-dot.pulse { animation: utpulse 1.4s ease-in-out infinite; }
+@keyframes utpulse { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+.ut-body { flex: 1; min-width: 0; }
+.ut-title { color: #eaf0ff; font-size: 13px; font-weight: 600; }
+.ut-sub { color: #8ea0c9; font-size: 11px; margin-top: 3px; }
+.ut-actions { display: flex; gap: 7px; margin-top: 9px; }
+.ut-primary { background: #2b4d86; color: #eaf3ff; border: 1px solid #3f66a8; border-radius: 7px; padding: 6px 11px; font-size: 12px; cursor: pointer; }
+.ut-primary:hover { background: #345c9e; }
+.ut-later { background: transparent; color: #8ea0c9; border: none; font-size: 12px; cursor: pointer; padding: 6px; }
+.ut-x { background: transparent; border: none; color: #5f6f9e; cursor: pointer; font-size: 12px; padding: 0; }
+.ut-bar { height: 4px; background: #16203c; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.ut-bar span { display: block; height: 100%; background: #6ea8ff; border-radius: 3px; }

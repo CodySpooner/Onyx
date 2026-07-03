@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
 import { scanVault, readNoteRaw } from './vault-indexer.mjs'
 import { loadConfig, saveConfig } from './config.js'
+import { setupUpdater, installUpdate } from './updater.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let win
@@ -94,6 +95,7 @@ ipcMain.handle('vault:readNote', async (_e, id) => {
 })
 ipcMain.handle('config:get', () => loadConfig())
 ipcMain.handle('config:set', (_e, patch) => saveConfig(patch))
+ipcMain.handle('update:install', () => installUpdate())
 ipcMain.handle('vault:pickVault', async () => {
   const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
   if (r.canceled || !r.filePaths[0]) return cachedGraph
@@ -107,6 +109,7 @@ app.whenReady().then(async () => {
   createWindow()
   await reindex()
   watchVault()
+  setupUpdater(win)
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })

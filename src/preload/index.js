@@ -10,5 +10,11 @@ contextBridge.exposeInMainWorld('onyx', {
     const h = (_e, g) => cb(g)
     ipcRenderer.on('vault:update', h)
     return () => ipcRenderer.removeListener('vault:update', h)
+  },
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  onUpdate: (cb) => {
+    const h = (_e, s) => cb(s)
+    ipcRenderer.on('update:status', h)
+    return () => ipcRenderer.removeListener('update:status', h)
   }
 })

@@ -7,6 +7,7 @@ import { NoteReader } from './components/NoteReader.jsx'
 import { HudSidebar } from './components/HudSidebar.jsx'
 import { FolderTabs } from './components/FolderTabs.jsx'
 import { HudToolbar } from './components/HudToolbar.jsx'
+import { UpdateToast } from './components/UpdateToast.jsx'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -114,6 +115,7 @@ export default function App() {
       {selected && (
         <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
       )}
+      <UpdateToast />
     </div>
   )
 }
