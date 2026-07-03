@@ -2,12 +2,37 @@
   "name": "onyx",
   "version": "0.1.0",
   "description": "Solar-system visual notes app over an Obsidian vault",
+  "author": "Cody Spooner <xody2x@gmail.com>",
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
-    "test": "node --test"
+    "test": "node --test",
+    "dist": "electron-vite build && electron-builder"
+  },
+  "build": {
+    "appId": "com.cody.onyx",
+    "productName": "Onyx",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Onyx"
+    }
   },
   "dependencies": {
     "chokidar": "^3.6.0",
@@ -18,7 +43,10 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.2",
     "electron": "^32.2.0",
+    "electron-builder": "^26.15.3",
     "electron-vite": "^2.3.0",
+    "jimp": "^1.6.1",
+    "png-to-ico": "^3.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "vite": "^5.4.8"
