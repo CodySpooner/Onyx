@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { hashAngle } from '../lib/graph.mjs'
+import { makeLabel } from '../lib/label.js'
 
 // "Core of Everything": a bright core at the top pole, notes on concentric
 // teardrop rings below it, radial lines fanning down from the core.
@@ -18,6 +19,8 @@ export class CoreView {
     this.container = container
     this.onSelect = onSelect
     this.nodes = []
+    this.labels = []
+    this.labelsVisible = true
     this.activeIds = null
     this.showLinks = true
 
@@ -140,6 +143,10 @@ export class CoreView {
         mesh.userData = { id: note.id }
         this.group.add(mesh)
         this.nodes.push({ mesh, id: note.id, baseColor: color.clone() })
+        const label = makeLabel(note.title, '#e6ecff', 0.05)
+        label.position.set(pos.x, pos.y + size + 1.6, pos.z)
+        this.group.add(label)
+        this.labels.push({ sprite: label, id: note.id })
         fanPts.push(corePos.x, corePos.y, corePos.z, pos.x, pos.y, pos.z)
       }
     })
@@ -171,6 +178,28 @@ export class CoreView {
     // the radial fan is structural to this view — always shown
   }
 
+  setLabels(show) {
+    this.labelsVisible = show !== false
+  }
+
+  _fadeLabels(near, far) {
+    const cam = this.camera.position
+    const tmp = new THREE.Vector3()
+    for (const l of this.labels) {
+      if (!this.labelsVisible) {
+        l.sprite.visible = false
+        continue
+      }
+      l.sprite.visible = true
+      l.sprite.getWorldPosition(tmp)
+      const d = tmp.distanceTo(cam)
+      let o = 1 - (d - near) / (far - near)
+      o = Math.max(0.03, Math.min(0.95, o))
+      if (this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
+      l.sprite.material.opacity = o
+    }
+  }
+
   _pick(e) {
     const r = this.renderer.domElement.getBoundingClientRect()
     this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
@@ -193,6 +222,7 @@ export class CoreView {
     this.group.rotation.y += 0.0012
     const pulse = 1 + Math.sin(this.clock.getElapsedTime() * 1.6) * 0.05
     if (this.core) this.core.scale.setScalar(pulse)
+    this._fadeLabels(150, 236)
     this.controls.update()
     this.composer.render()
   }
@@ -204,6 +234,7 @@ export class CoreView {
       n.mesh.material.dispose()
     }
     this.nodes = []
+    this.labels = []
     // remove all non-node children (rings, fan, core, halo)
     for (const child of [...this.group.children]) {
       this.group.remove(child)

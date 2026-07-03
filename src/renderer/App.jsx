@@ -13,6 +13,7 @@ export default function App() {
   const [filter, setFilter] = useState(EMPTY_FILTER)
   const [view, setView] = useState('solar')
   const [showAllLinks, setShowAllLinks] = useState(true)
+  const [showLabels, setShowLabels] = useState(false)
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
@@ -20,12 +21,15 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    window.onyx.getConfig().then((c) => setShowAllLinks(c.showAllLinks))
+    window.onyx.getConfig().then((c) => {
+      setShowAllLinks(c.showAllLinks)
+      setShowLabels(c.showLabels)
+    })
   }, [])
 
   // ponytail: verification hook so automated screenshots can drive the UI
   useEffect(() => {
-    window.__onyxDebug = { select: setSelected, setFilter, setView, setShowAllLinks }
+    window.__onyxDebug = { select: setSelected, setFilter, setView, setShowAllLinks, setShowLabels }
   }, [])
 
   if (!graph) {
@@ -70,6 +74,18 @@ export default function App() {
           />
           links
         </label>
+        <label className="linktoggle">
+          <input
+            type="checkbox"
+            checked={showLabels}
+            onChange={() => {
+              const next = !showLabels
+              setShowLabels(next)
+              window.onyx.setConfig({ showLabels: next })
+            }}
+          />
+          labels
+        </label>
         <ViewSwitcher view={view} onChange={setView} />
         <button onClick={() => window.onyx.pickVault().then(setGraph)}>Change vault</button>
       </header>
@@ -80,6 +96,7 @@ export default function App() {
         activeIds={filtering ? activeIds : null}
         onSelect={setSelected}
         showAllLinks={showAllLinks}
+        showLabels={showLabels}
       />
       {selected && (
         <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />

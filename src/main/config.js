@@ -6,7 +6,8 @@ const DEFAULTS = {
   vaultPath: 'C:\\Users\\Xody2\\OneDrive\\Desktop\\Xody Bets Website Vault',
   sizeBy: 'links',
   colorBy: 'folder',
-  showAllLinks: true
+  showAllLinks: true,
+  showLabels: false
 }
 
 const file = () => path.join(app.getPath('userData'), 'onyx-config.json')

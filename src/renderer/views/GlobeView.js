@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { hashAngle } from '../lib/graph.mjs'
+import { makeLabel } from '../lib/label.js'
 
 // "Second brain" globe: notes on nested spherical shells around a bright core,
 // radial lines to the core, wikilink chords, an equator + great-circle rings.
@@ -16,6 +17,8 @@ export class GlobeView {
     this.container = container
     this.onSelect = onSelect
     this.nodes = []
+    this.labels = []
+    this.labelsVisible = true
     this.activeIds = null
     this.showLinks = true
 
@@ -128,6 +131,10 @@ export class GlobeView {
       mesh.userData = { id: note.id }
       this.group.add(mesh)
       this.nodes.push({ mesh, id: note.id, baseColor: color.clone() })
+      const label = makeLabel(note.title, '#eef2ff', 0.045)
+      label.position.set(p.x, p.y + size + 1.3, p.z)
+      this.group.add(label)
+      this.labels.push({ sprite: label, id: note.id })
       radial.push(0, 0, 0, p.x, p.y, p.z)
     })
 
@@ -176,6 +183,28 @@ export class GlobeView {
     if (this.links) this.links.visible = this.showLinks
   }
 
+  setLabels(show) {
+    this.labelsVisible = show !== false
+  }
+
+  _fadeLabels(near, far) {
+    const cam = this.camera.position
+    const tmp = new THREE.Vector3()
+    for (const l of this.labels) {
+      if (!this.labelsVisible) {
+        l.sprite.visible = false
+        continue
+      }
+      l.sprite.visible = true
+      l.sprite.getWorldPosition(tmp)
+      const d = tmp.distanceTo(cam)
+      let o = 1 - (d - near) / (far - near)
+      o = Math.max(0.03, Math.min(0.95, o))
+      if (this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
+      l.sprite.material.opacity = o
+    }
+  }
+
   _pick(e) {
     const r = this.renderer.domElement.getBoundingClientRect()
     this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
@@ -198,6 +227,7 @@ export class GlobeView {
     this.group.rotation.y += 0.0011
     const pulse = 1 + Math.sin(this.clock.getElapsedTime() * 1.8) * 0.06
     if (this.core) this.core.scale.setScalar(pulse)
+    this._fadeLabels(112, 210)
     this.controls.update()
     this.composer.render()
   }
@@ -209,6 +239,7 @@ export class GlobeView {
       child.material?.dispose()
     }
     this.nodes = []
+    this.labels = []
     this.core = null
     this.links = null
   }
