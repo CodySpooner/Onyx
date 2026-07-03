@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
-import { scanVault, readNoteRaw } from './vault-indexer.mjs'
+import { scanVault, readNoteRaw, writeNoteRaw } from './vault-indexer.mjs'
 import { loadConfig, saveConfig } from './config.js'
 import { setupUpdater, installUpdate } from './updater.js'
 
@@ -91,6 +91,16 @@ ipcMain.handle('vault:readNote', async (_e, id) => {
     return await readNoteRaw(vaultPath, id)
   } catch {
     return null
+  }
+})
+ipcMain.handle('vault:writeNote', async (_e, id, content) => {
+  const { vaultPath } = loadConfig()
+  try {
+    await writeNoteRaw(vaultPath, id, content)
+    return true
+  } catch (e) {
+    console.error('writeNote failed:', e)
+    return false
   }
 })
 ipcMain.handle('config:get', () => loadConfig())

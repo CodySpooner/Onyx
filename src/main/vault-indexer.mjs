@@ -105,3 +105,10 @@ export async function scanVault(vaultPath) {
 export function readNoteRaw(vaultPath, id) {
   return fs.readFile(path.join(vaultPath, id), 'utf8')
 }
+
+export async function writeNoteRaw(vaultPath, id, content) {
+  const abs = path.join(vaultPath, id)
+  const rel = path.relative(vaultPath, abs)
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('refusing to write outside the vault')
+  return fs.writeFile(abs, content, 'utf8')
+}

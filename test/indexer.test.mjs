@@ -2,7 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { scanVault } from '../src/main/vault-indexer.mjs'
+import { mkdtempSync, rmSync } from 'node:fs'
+import os from 'node:os'
+import { scanVault, writeNoteRaw, readNoteRaw } from '../src/main/vault-indexer.mjs'
 
 const VAULT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixture-vault')
 
@@ -41,4 +43,15 @@ test('assigns folder ids from the top-level directory', async () => {
   const g = await scanVault(VAULT)
   const gamma = g.notes.find((n) => n.id.endsWith('Gamma Note.md'))
   assert.equal(gamma.folder, 'folder1')
+})
+
+test('writeNoteRaw round-trips content and refuses path traversal', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'onyx-'))
+  try {
+    await writeNoteRaw(dir, 'note.md', '# Hi\nedited')
+    assert.equal(await readNoteRaw(dir, 'note.md'), '# Hi\nedited')
+    await assert.rejects(() => writeNoteRaw(dir, '../escape.md', 'x'))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })

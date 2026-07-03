@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 contextBridge.exposeInMainWorld('onyx', {
   getGraph: () => ipcRenderer.invoke('vault:getGraph'),
   readNote: (id) => ipcRenderer.invoke('vault:readNote', id),
+  writeNote: (id, content) => ipcRenderer.invoke('vault:writeNote', id, content),
   pickVault: () => ipcRenderer.invoke('vault:pickVault'),
   getConfig: () => ipcRenderer.invoke('config:get'),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),

@@ -8,7 +8,7 @@ const md = new MarkdownIt({ html: true, linkify: true, breaks: true })
 function renderBody(raw, basenameToId) {
   const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '') // strip frontmatter
   const withLinks = body.replace(/(!?)\[\[([^\]]+)\]\]/g, (m, bang, inner) => {
-    if (bang) return m // leave ![[embeds]] as literal text in v1
+    if (bang) return m
     const [target, alias] = inner.split('|')
     const id = basenameToId.get(target.split('#')[0].trim().toLowerCase())
     const label = (alias || target).trim()
@@ -21,6 +21,9 @@ function renderBody(raw, basenameToId) {
 
 export function NoteReader({ id, graph, onSelect, onClose }) {
   const [raw, setRaw] = useState(null)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
   const ref = useRef(null)
   const note = graph.notes.find((n) => n.id === id)
 
@@ -36,10 +39,12 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
 
   useEffect(() => {
     setRaw(null)
+    setEditing(false)
     window.onyx.readNote(id).then(setRaw)
   }, [id])
 
   useEffect(() => {
+    if (editing) return
     const el = ref.current
     if (!el) return
     const h = (e) => {
@@ -51,7 +56,23 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
     }
     el.addEventListener('click', h)
     return () => el.removeEventListener('click', h)
-  }, [raw, onSelect])
+  }, [raw, editing, onSelect])
+
+  const startEdit = () => {
+    setDraft(raw || '')
+    setEditing(true)
+  }
+  const save = async () => {
+    setSaving(true)
+    const ok = await window.onyx.writeNote(id, draft)
+    setSaving(false)
+    if (ok) {
+      setRaw(draft)
+      setEditing(false)
+    } else {
+      alert('Could not save the note.')
+    }
+  }
 
   return (
     <aside className="reader">
@@ -67,10 +88,30 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
             {note?.updated && <span className="chip muted">{String(note.updated)}</span>}
           </div>
         </div>
-        <button onClick={onClose}>✕</button>
+        <div className="reader-actions">
+          {!editing && raw != null && (
+            <button onClick={startEdit} title="Edit note">✎</button>
+          )}
+          <button onClick={onClose} title="Close">✕</button>
+        </div>
       </div>
-      {raw == null ? (
-        <p className="muted" style={{ padding: 16 }}>loading…</p>
+      {editing ? (
+        <div className="reader-edit">
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} spellCheck={false} autoFocus />
+          <div className="edit-actions">
+            <button className="save" onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button onClick={() => setEditing(false)} disabled={saving}>
+              Cancel
+            </button>
+            <span className="edit-hint">saves to {id}</span>
+          </div>
+        </div>
+      ) : raw == null ? (
+        <p className="muted" style={{ padding: 16 }}>
+          loading…
+        </p>
       ) : (
         <div className="reader-body" ref={ref} dangerouslySetInnerHTML={{ __html: renderBody(raw, basenameToId) }} />
       )}
