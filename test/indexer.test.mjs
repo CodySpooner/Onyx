@@ -56,6 +56,14 @@ test('writeNoteRaw round-trips content and refuses path traversal', async () => 
   }
 })
 
+test('every note carries a numeric mtime (epoch ms)', async () => {
+  const g = await scanVault(VAULT)
+  for (const n of g.notes) {
+    assert.equal(typeof n.mtime, 'number')
+    assert.ok(n.mtime > 946684800000, `mtime looks like epoch ms: ${n.mtime}`) // > year 2000
+  }
+})
+
 test('createNote / renameNote / deleteNote round-trip; deleteNote refuses to escape', async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'onyx-'))
   try {

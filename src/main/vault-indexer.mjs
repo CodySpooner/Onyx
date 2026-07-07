@@ -47,6 +47,12 @@ export async function scanVault(vaultPath) {
       folders.set(folderId, { id: folderId, name: folderId, path: folderId, color: colorFor(folders.size) })
     }
     const raw = await fs.readFile(abs, 'utf8')
+    let mtime
+    try {
+      mtime = Math.round((await fs.stat(abs)).mtimeMs)
+    } catch {
+      mtime = null
+    }
     let data = {}
     let content = raw
     try {
@@ -66,6 +72,7 @@ export async function scanVault(vaultPath) {
       status: data.status ?? null,
       tags: normalizeTags(data.tags),
       updated: data.updated instanceof Date ? data.updated.toISOString().slice(0, 10) : (data.updated ?? null),
+      mtime: mtime ?? (Number.isFinite(Date.parse(data.updated)) ? Date.parse(data.updated) : Date.now()),
       wordCount: content.split(/\s+/).filter(Boolean).length,
       outLinks: [],
       inLinks: [],
