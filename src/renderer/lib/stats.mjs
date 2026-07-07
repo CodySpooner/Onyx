@@ -30,7 +30,8 @@ export function velocity(notes, now) {
   }
   const last6 = weeks.slice(6).reduce((s, x) => s + x, 0)
   const prior6 = weeks.slice(0, 6).reduce((s, x) => s + x, 0)
-  const trendPct = Math.round((100 * (last6 - prior6)) / Math.max(1, prior6))
+  const raw = Math.round((100 * (last6 - prior6)) / Math.max(1, prior6))
+  const trendPct = Math.max(-999, Math.min(999, raw)) // keep the readout sane when prior weeks are empty
   return { weeks, trendPct }
 }
 

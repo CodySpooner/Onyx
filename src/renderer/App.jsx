@@ -9,6 +9,7 @@ import { FolderTabs } from './components/FolderTabs.jsx'
 import { HudToolbar } from './components/HudToolbar.jsx'
 import { UpdateToast } from './components/UpdateToast.jsx'
 import { HoverCard } from './components/HoverCard.jsx'
+import { Cockpit } from './components/Cockpit.jsx'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -124,6 +125,7 @@ export default function App() {
           onCreate={handleCreate}
         />
         <div className="hud-spacer" />
+        <Cockpit graph={graph} onSelect={setSelected} />
         <HudToolbar
           showAllLinks={showAllLinks}
           onLinks={toggleLinks}
