@@ -240,6 +240,10 @@ export default function App() {
     const all = new Set([...auto.map((w) => w.id), ...ok.manual.map((w) => w.id)])
     if (ok.activeId || (wsStore.activeId && all.has(wsStore.activeId))) {
       setWorkspaceId(wsStore.activeId)
+      // booting scoped must be LOUD — a silently restored workspace reads as
+      // "my vault is gone" (1 note showing, no obvious cause)
+      const w = [...auto, ...ok.manual].find((x) => x.id === wsStore.activeId)
+      if (w) bus.emit('toast', { msg: `◈ workspace: ${w.name} — click the ● pill by search for ALL VAULT` })
     }
   }, [graph, wsStore])
   // a new slate means a clean slate: folder/tag filters from the previous
