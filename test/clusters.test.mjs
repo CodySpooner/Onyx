@@ -34,6 +34,18 @@ test('bridge node joins its denser side', () => {
   assert.equal(r.clusterCount, 2)
 })
 
+test('a hub linking two triangles does not flood them into one cluster', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'hub']
+  const links = [
+    { source: 'a', target: 'b' }, { source: 'b', target: 'c' }, { source: 'c', target: 'a' },
+    { source: 'd', target: 'e' }, { source: 'e', target: 'f' }, { source: 'f', target: 'd' },
+    { source: 'hub', target: 'a' }, { source: 'hub', target: 'd' }
+  ]
+  const r = detectClusters(ids, links)
+  assert.equal(r.clusterCount, 2)
+  assert.notEqual(r.clusterOf.get('a'), r.clusterOf.get('d'))
+})
+
 test('deterministic across runs', () => {
   const ids = ['n1', 'n2', 'n3', 'n4']
   const links = [{ source: 'n1', target: 'n2' }, { source: 'n3', target: 'n4' }]
