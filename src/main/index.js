@@ -7,6 +7,7 @@ import { loadConfig, saveConfig } from './config.js'
 import { setupUpdater, installUpdate, checkUpdatesNow } from './updater.js'
 import { loadUsage, bumpUsage, markUnlocked, loadSnapshots, recordSnapshot, flush } from './appdata.js'
 import { scanInstalledSkills } from './claude-skills.js'
+import { fetchBrowseLive } from './browse-live.js'
 import { storeGet, storeSet } from './store.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -165,6 +166,7 @@ ipcMain.handle('usage:bump', (_e, name, n) => bumpUsage(name, n))
 ipcMain.handle('usage:markUnlocked', (_e, ids) => markUnlocked(ids))
 ipcMain.handle('snapshots:get', () => loadSnapshots().days)
 ipcMain.handle('skills:installed', () => scanInstalledSkills())
+ipcMain.handle('browse:live', () => fetchBrowseLive())
 ipcMain.handle('store:get', (_e, name) => storeGet(name))
 ipcMain.handle('store:set', (_e, name, data) => storeSet(name, data))
 ipcMain.handle('shell:openExternal', (_e, url) => {

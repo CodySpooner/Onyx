@@ -4,6 +4,7 @@ import { BRANCH_COLORS } from '../lib/skills.mjs'
 import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { arsenalLayout, displayName } from '../lib/installed-skills.mjs'
 import { questValue } from '../lib/quests.mjs'
+import { BrowseSkills } from '../components/BrowseSkills.jsx'
 
 const BRANCH_ORDER = ['INTELLIGENCE', 'MEMORY', 'ARCHITECT', 'CARTOGRAPHER', 'RITUALIST', 'CURATOR', 'EXPLORER']
 const ROMAN = ['I', 'II', 'III', 'IV', 'V']
@@ -116,7 +117,7 @@ function Arsenal({ arsenal, onHover, onDetail, viewBox }) {
   )
 }
 
-export function SkillsMode({ evaluated, quests, usage, onReroll }) {
+export function SkillsMode({ evaluated, quests, usage, onReroll, notes = [] }) {
   const [hover, setHover] = useState(null) // { skill | arsenalSkill, x, y }
   const [tab, setTab] = useState('cortex')
   const [arsenal, setArsenal] = useState(null)
@@ -181,6 +182,9 @@ export function SkillsMode({ evaluated, quests, usage, onReroll }) {
           <button className={`u-label sk-tab${tab === 'quests' ? ' on' : ''}`} onClick={() => setTab('quests')}>
             QUESTS{quests ? ` · ${quests.daily.filter((q) => q.done).length + quests.weekly.filter((q) => q.done).length}/${quests.daily.length + quests.weekly.length}` : ''}
           </button>
+          <button className={`u-label sk-tab${tab === 'browse' ? ' on' : ''}`} onClick={() => setTab('browse')}>
+            BROWSE
+          </button>
         </span>
         <div className="skills-xp">
           <span className="num">
@@ -188,7 +192,9 @@ export function SkillsMode({ evaluated, quests, usage, onReroll }) {
               ? `${evaluated.xp.toLocaleString()} XP · LV ${evaluated.level} ${evaluated.title} · ${evaluated.unlockedCount}/${evaluated.totalCount} UNLOCKED`
               : tab === 'quests'
                 ? `DAILY + WEEKLY GOALS · QUEST XP FEEDS YOUR REAL LEVEL`
-                : `${arsenal?.skills?.length || 0} CLAUDE SKILLS INSTALLED ON THIS MACHINE · AUTO-REFRESHES`}
+                : tab === 'browse'
+                  ? 'DISCOVERY ONLY · INSTALL FROM YOUR TERMINAL · NEVER AUTO-INSTALLS'
+                  : `${arsenal?.skills?.length || 0} CLAUDE SKILLS INSTALLED ON THIS MACHINE · AUTO-REFRESHES`}
           </span>
           <span className="rule-progress">
             <i style={{ width: tab === 'cortex' ? `${Math.round(evaluated.levelPct * 100)}%` : '100%' }} />
@@ -200,6 +206,7 @@ export function SkillsMode({ evaluated, quests, usage, onReroll }) {
           <Arsenal arsenal={arsenal} onHover={setHover} viewBox={viewBox} onDetail={(s, c) => setDetail({ arsenalSkill: s, color: c })} />
         </div>
       )}
+      {tab === 'browse' && <BrowseSkills arsenal={arsenal} notes={notes} />}
       {tab === 'quests' && quests && (
         <div className="quests-wrap">
           <div className="quests-col">

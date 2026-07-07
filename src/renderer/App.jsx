@@ -730,7 +730,7 @@ export default function App() {
         />
       )}
       {mode === 'skills' && evaluated && (
-        <SkillsMode evaluated={evaluated} quests={quests} usage={usage} onReroll={rerollDaily} />
+        <SkillsMode evaluated={evaluated} quests={quests} usage={usage} onReroll={rerollDaily} notes={graph?.notes || []} />
       )}
       {overlay === 'palette' && (
         <CommandPalette graph={graph} actions={actions} onSelectNote={openNote} onClose={() => setOverlay(null)} />
