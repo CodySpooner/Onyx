@@ -832,3 +832,19 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .ol-rows { margin-top: 6px; max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; }
 .ol-row { background: transparent; border: none; border-radius: 5px; color: var(--text-dim); font-size: 11px; line-height: 1.4; padding: 3px 8px; cursor: pointer; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ol-row:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+
+/* ── find & replace ── */
+.fnr { position: absolute; left: 50%; top: 12vh; transform: translateX(-50%); width: 640px; max-width: 94vw; max-height: 74vh; padding: 16px 18px; border-radius: 14px; display: flex; flex-direction: column; gap: 10px; }
+.fnr-row { display: flex; gap: 8px; }
+.fnr-row .nl-filter { flex: 1; }
+.fnr-opts { align-items: center; color: var(--text-dim); font-size: 11px; gap: 16px; }
+.fnr-opts label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.fnr-spacer { flex: 1; }
+.fnr-results { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.fnr-file { border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; }
+.fnr-file.done { opacity: 0.55; }
+.fnr-file-head { display: flex; align-items: center; gap: 10px; }
+.fnr-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 600; font-size: 12px; }
+.fnr-meta { color: var(--text-faint); font-size: 10px; }
+.fnr-applied { color: var(--ok); }
+.fnr-prev { color: var(--text-faint); font: 400 10.5px/1.5 var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; }

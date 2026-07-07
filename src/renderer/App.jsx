@@ -30,6 +30,7 @@ import { insertWikilink, triageQueue } from './lib/suggest.mjs'
 import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
 import { TriageModal } from './components/TriageModal.jsx'
+import { FindReplaceModal } from './components/FindReplaceModal.jsx'
 import { NotesMode } from './modes/NotesMode.jsx'
 
 const skey = (s) => (s.a < s.b ? s.a + '|' + s.b : s.b + '|' + s.a)
@@ -247,6 +248,11 @@ export default function App() {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'n') {
         e.preventDefault()
         setOverlay('capture')
+        return
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault()
+        setOverlay('findreplace')
         return
       }
       if (e.ctrlKey && ['1', '2', '3', '4'].includes(e.key)) {
@@ -555,6 +561,7 @@ export default function App() {
     { label: 'Quick capture', hint: 'Ctrl+Shift+N', run: () => setOverlay('capture') },
     ...(due.length ? [{ label: `Review due cards (${due.length})`, hint: 'srs', run: openReview }] : []),
     ...(stats?.orphans ? [{ label: `Triage orphans (${stats.orphans})`, hint: 'inbox', run: openTriage }] : []),
+    { label: 'Find & replace in vault', hint: 'Ctrl+Shift+H', run: () => setOverlay('findreplace') },
     ...(selected
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
@@ -719,6 +726,9 @@ export default function App() {
       )}
       {overlay === 'review' && reviewQueue.length > 0 && (
         <ReviewModal due={reviewQueue} onGrade={handleGrade} onClose={() => setOverlay(null)} />
+      )}
+      {overlay === 'findreplace' && graph && (
+        <FindReplaceModal graph={graph} onClose={() => setOverlay(null)} />
       )}
       {overlay === 'triage' && triageRows.length > 0 && (
         <TriageModal
