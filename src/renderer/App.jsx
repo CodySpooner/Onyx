@@ -21,6 +21,7 @@ import { SkillsMode } from './modes/SkillsMode.jsx'
 import { CommandPalette } from './components/CommandPalette.jsx'
 import { QuickCapture } from './components/QuickCapture.jsx'
 import { dailyId, dailyTemplate, appendCapture } from './lib/daily.mjs'
+import { findTemplateFolder, applyTemplate } from './lib/templates.mjs'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -239,6 +240,25 @@ export default function App() {
     bus.emit('toast', { msg: `◆ captured to ${id.split('/').pop()}`, kind: 'info', ttl: 2200 })
     return true
   }
+  const createFromTemplate = async (templateId) => {
+    if (!guardDirty()) return
+    const raw = await window.onyx.readNote(templateId)
+    if (raw == null) {
+      bus.emit('toast', { msg: '✗ template unreadable', kind: 'err', ttl: 3000 })
+      return
+    }
+    const folder = filter.folders[0] || '(root)'
+    const id = await window.onyx.createNote(folder, 'Untitled')
+    if (!id) return
+    const ok = await window.onyx.writeNote(id, applyTemplate(raw, { title: 'Untitled', now: new Date() }))
+    if (!ok) bus.emit('toast', { msg: '✗ could not write the new note', kind: 'err', ttl: 3000 })
+    setGraph(await window.onyx.getGraph())
+    setSelected(id)
+    window.onyx.bumpUsage?.('noteCreate').then(setUsage)
+  }
+  const templateFolder = graph ? findTemplateFolder(graph.folders) : null
+  const templates = templateFolder ? graph.notes.filter((n) => n.folder === templateFolder) : []
+
   const togglePin = (id) => {
     if (!id) return
     const adding = !pins.includes(id)
@@ -259,6 +279,11 @@ export default function App() {
   const actions = [
     { label: 'New note', hint: 'create in active folder', run: handleCreate },
     { label: "Open today's daily note", hint: 'Ctrl+D', run: openDaily },
+    ...templates.map((t) => ({
+      label: `New from template: ${t.title}`,
+      hint: 'template',
+      run: () => createFromTemplate(t.id)
+    })),
     { label: 'Quick capture', hint: 'Ctrl+Shift+N', run: () => setOverlay('capture') },
     ...(selected
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
