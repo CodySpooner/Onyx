@@ -1,7 +1,7 @@
 name: Release
 
-# Push a version tag (e.g. v0.1.1) and GitHub builds the Windows installer
-# and publishes it to a new Release automatically.
+# Push a version tag (e.g. v0.3.1) and GitHub builds the Windows installer
+# and publishes it to a Release automatically.
 on:
   push:
     tags:
@@ -21,21 +21,30 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # electron-builder's publisher can drop the large .exe upload; re-attach the
-      # updater-critical assets with gh (robust for big files) so the release is complete.
-      - name: Ensure installer + update metadata are attached
-        if: always()
+      # Build only — electron-builder's own GitHub uploader silently dropped
+      # large assets twice (v0.2.2, v0.3.0), so publishing is handled below.
+      - run: npm run dist
+      - name: Stage assets with updater-exact names
         shell: bash
         run: |
-          TAG="${{ github.ref_name }}"
-          V="${TAG#v}"
-          gh release upload "$TAG" \
-            "release/Onyx Setup ${V}.exe" \
-            "release/Onyx Setup ${V}.exe.blockmap" \
-            "release/latest.yml" \
-            --clobber
+          V="${GITHUB_REF_NAME#v}"
+          mkdir -p upload
+          cp "release/Onyx Setup ${V}.exe" "upload/Onyx-Setup-${V}.exe"
+          cp "release/Onyx Setup ${V}.exe.blockmap" "upload/Onyx-Setup-${V}.exe.blockmap"
+          cp release/latest.yml upload/latest.yml
+          ls -la upload
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: upload/*
+      - name: Verify release is complete
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sleep 10
+          NAMES="$(gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name')"
+          echo "assets on $GITHUB_REF_NAME:"
+          echo "$NAMES"
+          echo "$NAMES" | grep -qx "Onyx-Setup-${GITHUB_REF_NAME#v}.exe" || { echo "::error::installer missing from release"; exit 1; }
+          echo "$NAMES" | grep -qx "latest.yml" || { echo "::error::latest.yml missing from release"; exit 1; }
