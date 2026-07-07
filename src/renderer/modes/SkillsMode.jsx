@@ -186,7 +186,9 @@ export function SkillsMode({ evaluated, quests, usage, onReroll }) {
           <span className="num">
             {tab === 'cortex'
               ? `${evaluated.xp.toLocaleString()} XP · LV ${evaluated.level} ${evaluated.title} · ${evaluated.unlockedCount}/${evaluated.totalCount} UNLOCKED`
-              : `${arsenal?.skills?.length || 0} CLAUDE SKILLS INSTALLED ON THIS MACHINE`}
+              : tab === 'quests'
+                ? `DAILY + WEEKLY GOALS · QUEST XP FEEDS YOUR REAL LEVEL`
+                : `${arsenal?.skills?.length || 0} CLAUDE SKILLS INSTALLED ON THIS MACHINE · AUTO-REFRESHES`}
           </span>
           <span className="rule-progress">
             <i style={{ width: tab === 'cortex' ? `${Math.round(evaluated.levelPct * 100)}%` : '100%' }} />
