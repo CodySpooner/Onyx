@@ -21,15 +21,19 @@ export function detectClusters(ids, links) {
         const L = label.get(nb)
         freq.set(L, (freq.get(L) || 0) + 1)
       }
-      let best = label.get(id)
-      let bestCount = -1
+      let best = -1
+      let bestCount = 0
       for (const [L, c] of freq) {
-        if (c > bestCount || (c === bestCount && L < best)) {
+        if (c > bestCount || (c === bestCount && (best === -1 || L < best))) {
           best = L
           bestCount = c
         }
       }
-      if (best !== label.get(id)) {
+      const cur = label.get(id)
+      // sticky ties: keeping the current label when it's tied-best stops big
+      // clusters from leaking across bridge nodes and swallowing small ones
+      if ((freq.get(cur) || 0) === bestCount) best = cur
+      if (best !== cur) {
         label.set(id, best)
         changed = true
       }
