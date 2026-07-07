@@ -64,9 +64,14 @@ export class BrainView {
     this.pointer = new THREE.Vector2()
     this._onMove = (e) => this._hover(e)
     this._onClick = (e) => this._click(e)
+    this._onDown = (e) => this._grabStart(e)
+    this._onUp = (e) => this._grabEnd(e)
+    this._grab = null // { rec, plane, last, vel, moved, startX, startY }
     this._onDbl = (e) => this._dblclick(e)
     this._onResize = () => this._resize()
     this.renderer.domElement.addEventListener('pointermove', this._onMove)
+    this.renderer.domElement.addEventListener('pointerdown', this._onDown)
+    this.renderer.domElement.addEventListener('pointerup', this._onUp)
     this.renderer.domElement.addEventListener('click', this._onClick)
     this.renderer.domElement.addEventListener('dblclick', this._onDbl)
     window.addEventListener('resize', this._onResize)
@@ -183,6 +188,74 @@ export class BrainView {
     this.hlGeo.attributes.position.needsUpdate = true
   }
 
+  // ── physics play mode: grab an orb and throw it ──
+  _grabStart(e) {
+    if (e.button !== 0) return
+    const hit = this._pick(e)
+    if (!hit) return
+    const rec = this.byId.get(hit.object.userData.id)
+    if (!rec) return
+    const normal = this.camera.getWorldDirection(new THREE.Vector3())
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, rec.mesh.position.clone())
+    this._grab = {
+      rec,
+      plane,
+      last: rec.mesh.position.clone(),
+      vel: new THREE.Vector3(),
+      moved: false,
+      startX: e.clientX,
+      startY: e.clientY
+    }
+  }
+
+  _grabMove(e) {
+    const g = this._grab
+    if (!g) return false
+    if (!g.moved) {
+      // 6px promotion threshold: below it, click/dblclick behave as before
+      if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < 6) return false
+      g.moved = true
+      this.controls.enabled = false
+      g.rec.mesh.material.emissiveIntensity = 1.8
+      this.renderer.domElement.style.cursor = 'grabbing'
+    }
+    const r = this.renderer.domElement.getBoundingClientRect()
+    this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
+    this.raycaster.setFromCamera(this.pointer, this.camera)
+    const target = new THREE.Vector3()
+    if (this.raycaster.ray.intersectPlane(g.plane, target)) {
+      const instVel = target.clone().sub(g.last).multiplyScalar(6) // smoothed toward per-tick scale
+      g.vel.lerp(instVel, 0.35)
+      g.last.copy(target)
+      const n = g.rec.simNode
+      n.x = target.x
+      n.y = target.y
+      n.z = target.z
+      n.vx = 0
+      n.vy = 0
+      n.vz = 0
+    }
+    return true
+  }
+
+  _grabEnd() {
+    const g = this._grab
+    this._grab = null
+    if (!g || !g.moved) return
+    this.controls.enabled = true
+    g.rec.mesh.material.emissiveIntensity = 0.9
+    this.renderer.domElement.style.cursor = 'default'
+    // throw: hand the smoothed velocity to the sim, clamped to 8 units/tick
+    const v = g.vel.clone()
+    const len = v.length()
+    if (len > 8) v.multiplyScalar(8 / len)
+    const n = g.rec.simNode
+    n.vx = v.x
+    n.vy = v.y
+    n.vz = v.z
+    this._justThrew = true // swallow the click that follows pointerup
+  }
+
   _pick(e) {
     const r = this.renderer.domElement.getBoundingClientRect()
     this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
@@ -191,12 +264,17 @@ export class BrainView {
   }
 
   _hover(e) {
+    if (this._grabMove(e)) return
     const hit = this._pick(e)
     this.renderer.domElement.style.cursor = hit ? 'pointer' : 'default'
     if (!this.pinned) this._setHover(hit ? hit.object.userData.id : null)
   }
 
   _click(e) {
+    if (this._justThrew) {
+      this._justThrew = false
+      return
+    }
     const hit = this._pick(e)
     clearTimeout(this._clickTimer)
     if (!hit) {
@@ -235,6 +313,16 @@ export class BrainView {
     this._t += dt
 
     if (this.sim) this.sim.tick(2)
+    if (this._grab?.moved) {
+      const g = this._grab
+      const n = g.rec.simNode
+      n.x = g.last.x
+      n.y = g.last.y
+      n.z = g.last.z
+      n.vx = 0
+      n.vy = 0
+      n.vz = 0
+    }
 
     // copy sim → meshes with hash-phased micro-drift (display only)
     for (const n of this.nodes) {
@@ -379,6 +467,8 @@ export class BrainView {
   dispose() {
     cancelAnimationFrame(this._raf)
     this.renderer.domElement.removeEventListener('pointermove', this._onMove)
+    this.renderer.domElement.removeEventListener('pointerdown', this._onDown)
+    this.renderer.domElement.removeEventListener('pointerup', this._onUp)
     this.renderer.domElement.removeEventListener('click', this._onClick)
     this.renderer.domElement.removeEventListener('dblclick', this._onDbl)
     window.removeEventListener('resize', this._onResize)
