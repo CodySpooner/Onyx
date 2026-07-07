@@ -774,3 +774,21 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .ctx button:hover { background: rgba(255,255,255,0.06); color: var(--text); }
 .ctx button.danger:hover { color: var(--err); }
 .ctx .u-label { padding: 6px 10px 8px; }
+
+/* ── dashboard pages ── */
+.dash-tabs { position: sticky; top: 0; z-index: 3; display: flex; gap: 18px; align-items: center; padding: 60px 26px 10px; }
+.dash-tabs-hint { margin-left: auto; opacity: 0.5; }
+.daily-preview { font: 400 10.5px/1.6 var(--font-mono); color: var(--text-dim); background: rgba(255,255,255,0.02); border: 1px solid var(--hairline); border-radius: 8px; padding: 10px 12px; margin: 8px 0; max-height: 190px; overflow: hidden; white-space: pre-wrap; word-break: break-word; }
+.cap-row { margin-top: 6px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cal-nav { background: transparent; border: none; color: var(--text-faint); cursor: pointer; font-size: 14px; padding: 0 8px; }
+.cal-nav:hover { color: var(--text); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 8px; }
+.cal-dow { text-align: center; opacity: 0.55; padding-bottom: 2px; }
+.cal-cell { position: relative; aspect-ratio: 1; background: rgba(255,255,255,0.02); border: 1px solid transparent; border-radius: 6px; color: var(--text-dim); font: 500 10px/1 var(--font-mono); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.cal-cell:hover:not(:disabled) { border-color: var(--brk); color: var(--text); }
+.cal-cell.dim { opacity: 0.3; }
+.cal-cell:disabled { opacity: 0.18; cursor: default; }
+.cal-cell.today { border-color: var(--accent); color: var(--text); }
+.cal-cell.has i { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.dash-tabs + .dash-grid { padding-top: 4px; }

@@ -324,9 +324,9 @@ export default function App() {
     setFlyTo((f) => ({ id: back, nonce: (f?.nonce || 0) + 1 }))
   }
   kbRef.current.goBack = goBack
-  const openDaily = async () => {
+  const openDaily = async (date = null) => {
     const folder = cfg?.dailyFolder || '06 - Daily Logs'
-    const now = new Date()
+    const now = date instanceof Date ? date : new Date() // guards click-event args
     const id = dailyId(now, folder)
     const res = await window.onyx.ensureNote?.(id, dailyTemplate(now))
     if (res?.created) setGraph(await window.onyx.getGraph())
@@ -669,6 +669,11 @@ export default function App() {
           onTriage={openTriage}
           onToggleTask={toggleTaskAt}
           pendingTasks={pendingTasks}
+          dueCount={due.length}
+          onReview={openReview}
+          onOpenDaily={openDaily}
+          onCapture={handleCapture}
+          dailyFolder={cfg?.dailyFolder || '06 - Daily Logs'}
         />
       )}
       {mode === 'skills' && evaluated && <SkillsMode evaluated={evaluated} />}
