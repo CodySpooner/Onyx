@@ -82,6 +82,17 @@ export default function App() {
 
   return (
     <div className="app hud">
+      <div className="stage">
+        <SpaceCanvas
+          view={view}
+          graph={graph}
+          activeIds={filtering ? activeIds : null}
+          onSelect={setSelected}
+          showAllLinks={showAllLinks}
+          showLabels={showLabels}
+          resetNonce={resetNonce}
+        />
+      </div>
       <header className="topbar">
         <span className="brand">◑ Onyx</span>
         <span className="stats">
@@ -102,17 +113,7 @@ export default function App() {
           onSelect={setSelected}
           onCreate={handleCreate}
         />
-        <div className="stage">
-          <SpaceCanvas
-            view={view}
-            graph={graph}
-            activeIds={filtering ? activeIds : null}
-            onSelect={setSelected}
-            showAllLinks={showAllLinks}
-            showLabels={showLabels}
-            resetNonce={resetNonce}
-          />
-        </div>
+        <div className="hud-spacer" />
         <HudToolbar
           showAllLinks={showAllLinks}
           onLinks={toggleLinks}

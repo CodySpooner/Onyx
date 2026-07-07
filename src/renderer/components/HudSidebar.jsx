@@ -21,7 +21,7 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
   }
 
   return (
-    <aside className="hud-left">
+    <aside className="hud-left glass">
       <div className="hud-brand">◑ ONYX</div>
 
       <input

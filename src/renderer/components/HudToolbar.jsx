@@ -42,7 +42,7 @@ function TBtn({ icon, on, onClick, title }) {
 
 export function HudToolbar({ showAllLinks, onLinks, showLabels, onLabels, onReset }) {
   return (
-    <aside className="hud-right">
+    <aside className="hud-right glass">
       <TBtn icon="links" on={showAllLinks} onClick={onLinks} title="Toggle links" />
       <TBtn icon="labels" on={showLabels} onClick={onLabels} title="Toggle labels" />
       <TBtn icon="reset" onClick={onReset} title="Reset camera" />
