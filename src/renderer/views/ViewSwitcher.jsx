@@ -1,4 +1,5 @@
 const VIEWS = [
+  { id: 'brain', label: '🧠 Brain' },
   { id: 'solar', label: '☀ Solar System' },
   { id: 'core', label: '◉ Core of Everything' },
   { id: 'globe', label: '⊕ Second Brain' },

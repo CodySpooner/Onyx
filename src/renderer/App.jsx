@@ -15,7 +15,7 @@ export default function App() {
   const [graph, setGraph] = useState(null)
   const [selected, setSelected] = useState(null)
   const [filter, setFilter] = useState(EMPTY_FILTER)
-  const [view, setView] = useState('solar')
+  const [view, setView] = useState('brain')
   const [showAllLinks, setShowAllLinks] = useState(true)
   const [showLabels, setShowLabels] = useState(false)
   const [resetNonce, setResetNonce] = useState(0)

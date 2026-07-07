@@ -3,16 +3,17 @@ import { SolarSystemView } from './SolarSystemView.js'
 import { GraphView } from './GraphView.js'
 import { CoreView } from './CoreView.js'
 import { GlobeView } from './GlobeView.js'
+import { BrainView } from './BrainView.js'
 
-const VIEWS = { solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
+const VIEWS = { brain: BrainView, solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
 
-export function SpaceCanvas({ view, graph, activeIds, onSelect, showAllLinks = true, showLabels = false, resetNonce = 0 }) {
+export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0 }) {
   const ref = useRef(null)
   const inst = useRef(null)
 
   useEffect(() => {
-    const View = VIEWS[view] || SolarSystemView
-    inst.current = new View(ref.current, { onSelect })
+    const View = VIEWS[view] || BrainView
+    inst.current = new View(ref.current, { onSelect, onHover })
     inst.current.update(graph)
     inst.current.setActive(activeIds)
     inst.current.setLinksMode?.(showAllLinks)
