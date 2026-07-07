@@ -16,6 +16,8 @@ import { StatusBar } from './components/StatusBar.jsx'
 import { Toasts } from './components/Toasts.jsx'
 import { HoverLayer } from './components/HoverLayer.jsx'
 import { BootSequence } from './components/BootSequence.jsx'
+import { DashboardMode } from './modes/DashboardMode.jsx'
+import { SkillsMode } from './modes/SkillsMode.jsx'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -71,6 +73,19 @@ export default function App() {
     () => (graph ? evaluateSkills(buildSkillStats(graph, usage, Date.now())) : null),
     [graph, usage]
   )
+
+  // unlock-diff: toast + persist newly unlocked skills (works in any mode)
+  useEffect(() => {
+    if (!evaluated || !usage) return
+    const fresh = evaluated.skills.filter((s) => s.unlocked && !usage.unlockedAt?.[s.id])
+    if (!fresh.length) return
+    if (fresh.length > 3) {
+      bus.emit('toast', { msg: `◆ ${fresh.length} SKILLS UNLOCKED · +${fresh.length * 50} XP`, kind: 'skill' })
+    } else {
+      for (const s of fresh) bus.emit('toast', { msg: `◆ SKILL UNLOCKED — ${s.name} · +50 XP`, kind: 'skill' })
+    }
+    window.onyx.markUnlocked?.(fresh.map((s) => s.id)).then(setUsage)
+  }, [evaluated, usage])
 
   // keyboard contract — one listener; handler reads fresh state via ref
   const kbRef = useRef({})
@@ -191,15 +206,18 @@ export default function App() {
         </>
       )}
       {mode === 'dashboard' && (
-        <div className="mode-scrim">
-          <div className="mode-placeholder">DASHBOARD · ONLINE IN C3</div>
-        </div>
+        <DashboardMode
+          graph={graph}
+          clusters={clusters}
+          usage={usage}
+          onSelect={setSelected}
+          onFilter={(f) => {
+            setFilter(f)
+            setMode('brain')
+          }}
+        />
       )}
-      {mode === 'skills' && (
-        <div className="mode-scrim">
-          <div className="mode-placeholder">CORTEX · ONLINE IN C3</div>
-        </div>
-      )}
+      {mode === 'skills' && evaluated && <SkillsMode evaluated={evaluated} />}
       {selected && (
         <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
       )}
