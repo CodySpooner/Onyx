@@ -40,6 +40,7 @@ export class GraphView {
 
     const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.65, 0.5, 0.3] })
     this.composer = cine.composer
+    this.cineDispose = cine.dispose
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
@@ -205,6 +206,7 @@ export class GraphView {
     this._clear()
     this.controls.dispose()
     this.envTex?.dispose()
+    this.cineDispose?.()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement)

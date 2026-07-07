@@ -26,6 +26,7 @@ export class NexusView {
     this.byMesh = new Map() // InstancedMesh → recs array (index-aligned)
     this.labels = []
     this.labelsVisible = true
+    this.showAllLinks = true
     this.activeIds = null
     this.hoverId = null
     this.pinned = false
@@ -56,6 +57,7 @@ export class NexusView {
 
     const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.55, 0.5, 0.4] })
     this.composer = cine.composer
+    this.cineDispose = cine.dispose
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
@@ -264,6 +266,7 @@ export class NexusView {
     if (nMotes > 0) this.group.add(this.motePoints)
 
     this.setActive(this.activeIds)
+    this.setLinksMode(this.showAllLinks)
   }
 
   setActive(idSet) {
@@ -281,7 +284,8 @@ export class NexusView {
   }
 
   setLinksMode(showAll) {
-    if (this.motePoints) this.motePoints.visible = showAll !== false
+    this.showAllLinks = showAll !== false
+    if (this.motePoints) this.motePoints.visible = this.showAllLinks
   }
 
   setLabels(show) {
@@ -497,7 +501,10 @@ export class NexusView {
     }
     this.shards.dispose()
     this.shardMat.dispose()
+    this.shaftA.children[0]?.material.dispose()
+    for (const c of this.shaftA.children) c.geometry.dispose()
     this.envTex?.dispose()
+    this.cineDispose?.()
     this.controls.dispose()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {

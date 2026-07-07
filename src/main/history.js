@@ -8,7 +8,8 @@ import { fnv1a32 } from '../renderer/lib/hash.mjs'
 
 const CAP = 20 // snapshots kept per note
 
-const dirFor = (noteId) => path.join(app.getPath('userData'), 'onyx-history', String(fnv1a32(noteId)))
+const dirFor = (noteId) =>
+  path.join(app.getPath('userData'), 'onyx-history', fnv1a32(noteId) + '-' + String(noteId).replace(/[^a-zA-Z0-9]/g, '_').slice(-60))
 
 export function snapshotNote(noteId, content) {
   try {

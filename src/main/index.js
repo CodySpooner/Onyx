@@ -16,6 +16,11 @@ let win
 let watcher
 let cachedGraph = null
 
+// matches absolute watcher paths AND vault-relative ids ('/' prefix trick);
+// digest _AGENT.md excluded so exporting can't self-complete the quest
+const isProjectLog = (p) =>
+  /[\\/]Claude Projects[\\/][^\\/]+\.md$/.test('/' + String(p || '')) && !String(p).split(/[\\/]/).pop().startsWith('_')
+
 async function reindex() {
   const { vaultPath } = loadConfig()
   if (!vaultPath) {
@@ -55,9 +60,7 @@ function watchVault() {
   const bump = (p) => {
     // agent edits to project logs fuel the quest counter (digest _AGENT.md
     // excluded so exporting can't self-complete it)
-    if (/[\\/]Claude Projects[\\/][^\\/]+\.md$/.test(String(p || '')) && !String(p).split(/[\\/]/).pop().startsWith('_')) {
-      sawProjectLog = true
-    }
+    if (isProjectLog(p)) sawProjectLog = true
     clearTimeout(t)
     t = setTimeout(async () => {
       bumpUsage('vaultEdit') // Obsidian edits count toward streaks too
@@ -134,6 +137,7 @@ ipcMain.handle('vault:writeNote', async (_e, id, content) => {
       if (prev != null && prev !== content) snapshotNote(id, prev)
     } catch { /* new file — nothing to shadow */ }
     await writeNoteRaw(vaultPath, id, content)
+    if (isProjectLog(id)) bumpUsage('projectLogEdit') // in-app saves must not depend on chokidar
     // don't rely on chokidar (flaky on OneDrive): reindex + broadcast now so
     // optimistic UI (pending task marks) always resolves
     const g = await reindex()

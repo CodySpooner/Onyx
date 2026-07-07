@@ -115,6 +115,7 @@ export class ArchiveCityView {
 
     const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.75, 0.5, 0.28] })
     this.composer = cine.composer
+    this.cineDispose = cine.dispose
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
@@ -472,6 +473,7 @@ export class ArchiveCityView {
     this._clear()
     this.controls.dispose()
     this.envTex?.dispose()
+    this.cineDispose?.()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement)

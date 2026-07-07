@@ -53,6 +53,7 @@ export class BrainView {
 
     const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.65, 0.5, 0.3] })
     this.composer = cine.composer
+    this.cineDispose = cine.dispose
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
@@ -72,6 +73,7 @@ export class BrainView {
     this.renderer.domElement.addEventListener('pointermove', this._onMove)
     this.renderer.domElement.addEventListener('pointerdown', this._onDown)
     this.renderer.domElement.addEventListener('pointerup', this._onUp)
+    this.renderer.domElement.addEventListener('pointercancel', this._onUp)
     this.renderer.domElement.addEventListener('click', this._onClick)
     this.renderer.domElement.addEventListener('dblclick', this._onDbl)
     window.addEventListener('resize', this._onResize)
@@ -83,6 +85,8 @@ export class BrainView {
 
   update(graph) {
     this.graph = graph
+    const prevIds = new Set(this.byId.keys()) // stagger only NEW notes — saves must not replay the show
+    let newCount = 0
     this._clear()
 
     const ids = graph.notes.map((n) => n.id)
@@ -99,7 +103,7 @@ export class BrainView {
       const orb = makeOrb(colorHex, size, note.type, note.id)
       orb.mesh.position.set(simNode.x, simNode.y, simNode.z)
       this.group.add(orb.mesh)
-      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci, bornAt: this._t + this.nodes.length * 0.015 }
+      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci, bornAt: prevIds.has(note.id) ? this._t - 0.6 : this._t + newCount++ * 0.015 }
       this.nodes.push(rec)
       this.byId.set(note.id, rec)
 
@@ -197,6 +201,10 @@ export class BrainView {
     if (!rec) return
     const normal = this.camera.getWorldDirection(new THREE.Vector3())
     const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(normal, rec.mesh.position.clone())
+    this.controls.enabled = false // no camera lurch during the 0-6px candidate phase
+    try {
+      this.renderer.domElement.setPointerCapture(e.pointerId) // releases outside the canvas still reach us
+    } catch { /* pointer capture unsupported → window-edge release stays best-effort */ }
     this._grab = {
       rec,
       plane,
@@ -215,7 +223,6 @@ export class BrainView {
       // 6px promotion threshold: below it, click/dblclick behave as before
       if (Math.hypot(e.clientX - g.startX, e.clientY - g.startY) < 6) return false
       g.moved = true
-      this.controls.enabled = false
       g.rec.mesh.material.emissiveIntensity = 1.8
       this.renderer.domElement.style.cursor = 'grabbing'
     }
@@ -238,11 +245,15 @@ export class BrainView {
     return true
   }
 
-  _grabEnd() {
+  _grabEnd(e) {
     const g = this._grab
     this._grab = null
-    if (!g || !g.moved) return
-    this.controls.enabled = true
+    if (!g) return
+    this.controls.enabled = true // re-enable even for a plain click-grab
+    try {
+      if (e?.pointerId != null) this.renderer.domElement.releasePointerCapture(e.pointerId)
+    } catch { /* already released */ }
+    if (!g.moved) return
     g.rec.mesh.material.emissiveIntensity = 0.9
     this.renderer.domElement.style.cursor = 'default'
     // throw: hand the smoothed velocity to the sim, clamped to 8 units/tick
@@ -469,6 +480,7 @@ export class BrainView {
     this.renderer.domElement.removeEventListener('pointermove', this._onMove)
     this.renderer.domElement.removeEventListener('pointerdown', this._onDown)
     this.renderer.domElement.removeEventListener('pointerup', this._onUp)
+    this.renderer.domElement.removeEventListener('pointercancel', this._onUp)
     this.renderer.domElement.removeEventListener('click', this._onClick)
     this.renderer.domElement.removeEventListener('dblclick', this._onDbl)
     window.removeEventListener('resize', this._onResize)
@@ -476,6 +488,7 @@ export class BrainView {
     this._clear()
     this.controls.dispose()
     this.envTex?.dispose()
+    this.cineDispose?.()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement)

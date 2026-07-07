@@ -32,11 +32,13 @@ function History({ id, raw }) {
       bus.emit('toast', { msg: '✕ snapshot unreadable', kind: 'err' })
       return
     }
-    setView({ ...item, content, ...diffLines(content, raw ?? '') })
+    setView({ ...item, content, base: raw ?? '', ...diffLines(content, raw ?? '') })
   }
   const restore = async () => {
+    // CAS against the content the on-screen diff was computed from — NOT the
+    // live raw prop, which auto-refreshes on watcher broadcasts
     const cur = await window.onyx.readNote(id)
-    if (cur !== (raw ?? cur)) {
+    if (cur !== view.base) {
       bus.emit('toast', { msg: '✕ note changed since you opened it — reopen and retry', kind: 'err' })
       return
     }
@@ -45,7 +47,7 @@ function History({ id, raw }) {
       bus.emit('toast', { msg: '✕ restore failed — vault not writable', kind: 'err' })
       return
     }
-    const before = cur
+    const before = view.base
     bus.emit('toast', {
       msg: `⌛ restored snapshot from ${stamp(view.ts)}`,
       kind: 'skill',

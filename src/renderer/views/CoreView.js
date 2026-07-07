@@ -48,6 +48,7 @@ export class CoreView {
 
     const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.65, 0.5, 0.3] })
     this.composer = cine.composer
+    this.cineDispose = cine.dispose
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
@@ -227,8 +228,15 @@ export class CoreView {
     }
     for (const child of [...this.group.children]) {
       this.group.remove(child)
-      child.material?.dispose()
-      if (!child.userData?.sharedGeo) child.geometry?.dispose()
+      if (child.isGroup) {
+        for (const sub of child.children) {
+          sub.material?.dispose()
+          if (!sub.userData?.sharedGeo) sub.geometry?.dispose()
+        }
+      } else {
+        child.material?.dispose()
+        if (!child.userData?.sharedGeo) child.geometry?.dispose()
+      }
     }
     this.nodes = []
     this.labels = []
@@ -265,6 +273,7 @@ export class CoreView {
     this._clear()
     this.controls.dispose()
     this.envTex?.dispose()
+    this.cineDispose?.()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement)

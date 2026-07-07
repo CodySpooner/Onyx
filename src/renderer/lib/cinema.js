@@ -102,5 +102,9 @@ export function makeComposer(renderer, scene, camera, { w, h, bloom = [0.65, 0.5
   const grade = new ShaderPass(GradeShader)
   composer.addPass(grade)
   composer.addPass(new OutputPass()) // required in r169: applies tonemap+sRGB in composer chains
-  return { composer, grade }
+  const dispose = () => {
+    for (const pass of composer.passes) pass.dispose?.()
+    composer.dispose() // frees renderTarget1/2 — renderer.dispose() does NOT
+  }
+  return { composer, grade, dispose }
 }
