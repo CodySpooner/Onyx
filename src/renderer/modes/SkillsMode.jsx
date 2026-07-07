@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { hashAngle } from '../lib/graph.mjs'
 import { BRANCH_COLORS } from '../lib/skills.mjs'
 import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
@@ -131,10 +131,39 @@ export function SkillsMode({ evaluated, quests, usage, onReroll, notes = [] }) {
     const t = setInterval(scan, 60000)
     return () => clearInterval(t)
   }, [tab])
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const dragRef = useRef(null)
   const onWheel = (e) => {
     setZoom((z) => Math.max(0.45, Math.min(2.4, e.deltaY > 0 ? z * 1.12 : z / 1.12)))
   }
-  const viewBox = `${-620 * zoom} ${-540 * zoom} ${1240 * zoom} ${1080 * zoom}`
+  // drag to look around once zoomed — double-click recenters
+  const onStageDown = (e) => {
+    if (e.button !== 0) return
+    dragRef.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y }
+  }
+  const onStageMove = (e) => {
+    const d = dragRef.current
+    if (!d) return
+    const el = e.currentTarget
+    const scale = (1240 * zoom) / Math.max(1, el.clientWidth || 1200)
+    setPan({ x: d.px - (e.clientX - d.x) * scale, y: d.py - (e.clientY - d.y) * scale })
+  }
+  const onStageUp = () => {
+    dragRef.current = null
+  }
+  const resetView = () => {
+    setPan({ x: 0, y: 0 })
+    setZoom(1)
+  }
+  const stageProps = {
+    onWheel,
+    onPointerDown: onStageDown,
+    onPointerMove: onStageMove,
+    onPointerUp: onStageUp,
+    onPointerLeave: onStageUp,
+    onDoubleClick: resetView
+  }
+  const viewBox = `${-620 * zoom + pan.x} ${-540 * zoom + pan.y} ${1240 * zoom} ${1080 * zoom}`
   const layout = useMemo(() => {
     const nodes = new Map()
     for (const s of evaluated.skills) {
@@ -202,7 +231,7 @@ export function SkillsMode({ evaluated, quests, usage, onReroll, notes = [] }) {
         </div>
       </div>
       {tab === 'arsenal' && (
-        <div className="skills-stage" onWheel={onWheel}>
+        <div className="skills-stage" {...stageProps}>
           <Arsenal arsenal={arsenal} onHover={setHover} viewBox={viewBox} onDetail={(s, c) => setDetail({ arsenalSkill: s, color: c })} />
         </div>
       )}
@@ -254,7 +283,7 @@ export function SkillsMode({ evaluated, quests, usage, onReroll, notes = [] }) {
         </div>
       )}
       {tab === 'cortex' && (
-      <div className="skills-stage" onWheel={onWheel}>
+      <div className="skills-stage" {...stageProps}>
       <svg className="skills-svg" viewBox={viewBox}>
         {/* edges */}
         {layout.edges.map((e) => {

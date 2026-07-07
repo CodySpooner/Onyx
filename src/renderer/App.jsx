@@ -763,6 +763,7 @@ export default function App() {
       {selected && mode !== 'notes' && (
         <NoteReader
           id={selected}
+          onFullscreen={() => setFocusMode((f) => !f)}
           graph={graph}
           clusters={clusters}
           suggestions={suggestions}

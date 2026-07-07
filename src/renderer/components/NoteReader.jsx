@@ -312,7 +312,7 @@ function renderBody(raw, basenameToId) {
   return md.render(withLinks)
 }
 
-export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSuggestion, onDismissSuggestion, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage, onEditingChange, docked = false }) {
+export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSuggestion, onDismissSuggestion, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage, onEditingChange, docked = false, onFullscreen = null }) {
   const [raw, setRaw] = useState(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -472,6 +472,9 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
           <button onClick={onTogglePin} className={pinned ? 'pin on' : 'pin'} data-tip={pinned ? 'Unpin' : 'Pin'}>
             {pinned ? '◉' : '⊙'}
           </button>
+          {onFullscreen && !docked && (
+            <button onClick={onFullscreen} data-tip="Fullscreen · Esc exits">⛶</button>
+          )}
           {!editing && raw != null && (
             <button onClick={startEdit} data-tip="Edit note">✎</button>
           )}
