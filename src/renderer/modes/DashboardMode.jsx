@@ -4,6 +4,7 @@ import { Heatmap } from '../components/Heatmap.jsx'
 import { TasksPanel } from '../components/TasksPanel.jsx'
 import { ResurfacePanel } from '../components/ResurfacePanel.jsx'
 import { ReadingList } from '../components/ReadingList.jsx'
+import { HabitGrid } from '../components/HabitGrid.jsx'
 import { Num } from '../components/chrome.jsx'
 import { maturity, coldNotes, cleanFolder } from '../lib/stats.mjs'
 import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
@@ -257,6 +258,12 @@ export function DashboardMode({ graph, clusters, usage, onSelect, onFilter }) {
         {graph.notes.some((n) => n.url) && (
           <section className="dpanel brk panel-in span4" style={{ '--i': 12 }}>
             <ReadingList graph={graph} onSelect={onSelect} />
+          </section>
+        )}
+
+        {(graph.habitEntries?.length || 0) > 0 && (
+          <section className="dpanel brk panel-in span4" style={{ '--i': 13 }}>
+            <HabitGrid graph={graph} />
           </section>
         )}
       </div>

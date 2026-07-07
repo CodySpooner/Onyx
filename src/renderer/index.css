@@ -512,3 +512,14 @@ button:hover { background: #26335c; }
 .rl-host { color: var(--text-faint); font: 400 9px var(--font-mono); letter-spacing: 0.04em; flex: none; }
 .rl-open { background: transparent; border: none; padding: 0 2px; color: var(--accent); cursor: pointer; font-size: 12px; }
 .rl-open:hover { text-shadow: 0 0 8px var(--glow); background: transparent; }
+
+/* habits (B7) */
+.hb-row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.hb-name { width: 90px; color: var(--text-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: none; }
+.hb-cells { display: flex; gap: 2px; flex: 1; }
+.hb-cell { width: 6px; height: 12px; border-radius: 1.5px; }
+.hb-cell.done { background: var(--accent); box-shadow: 0 0 4px var(--glow); }
+.hb-cell.missed { background: rgba(255,255,255,0.08); }
+.hb-cell.none { background: transparent; border: 1px solid var(--hairline); }
+.hb-pct { color: var(--text-faint); font-size: 10px; width: 32px; text-align: right; }
+.hb-streak { color: var(--warn); font-size: 10px; }

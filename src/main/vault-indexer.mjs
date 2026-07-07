@@ -4,6 +4,7 @@ import path from 'node:path'
 import matter from 'gray-matter'
 import { parseTasks } from '../renderer/lib/tasks.mjs'
 import { parseCards } from '../renderer/lib/srs.mjs'
+import { parseHabitLines, dailyDateFromId } from '../renderer/lib/habits.mjs'
 
 const SAFE = /[\\/:*?"<>|#^[\]]/g
 function insideVault(vaultPath, abs) {
@@ -40,6 +41,7 @@ export async function scanVault(vaultPath) {
   const files = await walk(vaultPath)
   const folders = new Map()
   const cards = []
+  const habitEntries = []
   const notes = []
   const byBasename = new Map() // lowercase basename → note id
 
@@ -86,6 +88,8 @@ export async function scanVault(vaultPath) {
       _content: content
     })
     cards.push(...parseCards(rel, raw, noteTags))
+    const dailyDate = dailyDateFromId(rel)
+    if (dailyDate) habitEntries.push(...parseHabitLines(raw, dailyDate))
     byBasename.set(base.toLowerCase(), rel)
   }
 
@@ -114,6 +118,7 @@ export async function scanVault(vaultPath) {
   return {
     folders: [...folders.values()],
     cards,
+    habitEntries,
     notes: publicNotes,
     links,
     meta: {
