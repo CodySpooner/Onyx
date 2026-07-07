@@ -446,3 +446,9 @@ button:hover { background: #26335c; }
 .hud-btnrow .hud-new { flex: 1; }
 .reader-actions .pin { color: #7c8ab5; }
 .reader-actions .pin.on { color: var(--warn); border-color: rgba(255, 209, 102, 0.4); }
+
+/* reduced motion: kill ambients, snap transitions */
+@media (prefers-reduced-motion: reduce) {
+  .sdot, .mtab.on::after, .st-spin, .st-pulse, .panel-in, .toast, .boot-scan { animation: none !important; opacity: 1; }
+  .stage, .sec-body, .rule-progress i, .capture { transition: none !important; }
+}

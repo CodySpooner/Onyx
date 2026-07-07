@@ -36,14 +36,12 @@ export function Cockpit({ graph, clusters, onSelect, onUsage }) {
 
   return (
     <aside className="cockpit">
-      <div className="glass cpanel">
+      <div className="glass cpanel brk panel-in" style={{ '--i': 0 }}>
         <div className="sec-h">MATURITY</div>
         <div className="cp-row">
           <Gauge value={d.mat.score} label="SCORE" />
           <div className="cp-sub">
-            <div>
-              {graph.meta.noteCount} notes · {d.clusterCount} clusters
-            </div>
+            <div>{d.clusterCount} clusters · 5-part score</div>
             <div className="bar"><i style={{ width: `${d.mat.connectedRatio * 100}%` }} /></div>
             <div className="bar"><i style={{ width: `${d.mat.freshRatio * 100}%` }} /></div>
             <div className="bar"><i style={{ width: `${d.mat.densityScore * 100}%` }} /></div>
@@ -52,7 +50,7 @@ export function Cockpit({ graph, clusters, onSelect, onUsage }) {
         </div>
       </div>
 
-      <div className="glass cpanel">
+      <div className="glass cpanel brk panel-in" style={{ '--i': 1 }}>
         <div className="sec-h">VELOCITY · 12 WK</div>
         <Spark weeks={d.vel.weeks} />
         <div className={`cp-trend ${d.vel.trendPct >= 0 ? 'up' : 'down'}`}>
@@ -62,7 +60,7 @@ export function Cockpit({ graph, clusters, onSelect, onUsage }) {
       </div>
 
       {d.cold.length > 0 && (
-        <div className="glass cpanel">
+        <div className="glass cpanel brk panel-in" style={{ '--i': 2 }}>
           <div className="sec-h">COLD NOTES ›60D</div>
           {d.cold.slice(0, 5).map((c) => (
             <button
@@ -80,7 +78,7 @@ export function Cockpit({ graph, clusters, onSelect, onUsage }) {
         </div>
       )}
 
-      <div className="glass cpanel">
+      <div className="glass cpanel brk panel-in" style={{ '--i': 3 }}>
         <div className="sec-h">BRIDGES · {d.br.count}</div>
         {d.br.top.slice(0, 3).map((t) => (
           <button
@@ -97,7 +95,7 @@ export function Cockpit({ graph, clusters, onSelect, onUsage }) {
         ))}
       </div>
 
-      <div className="glass cpanel">
+      <div className="glass cpanel brk panel-in" style={{ '--i': 4 }}>
         <div className="sec-h">NEXT ACTIONS</div>
         {d.acts.map((a, i) => (
           <div key={i} className="cp-act">

@@ -1,12 +1,22 @@
 # ◑ Onyx
 
-**Your mind, upgraded.** A desktop second brain that renders your Obsidian
-vault as a living neural network — clusters emerge from your links, synapses
-fire between thoughts, and a floating glass cockpit tracks the health of your
-knowledge. Read, edit, create, and rewire notes without leaving the brain.
+**Your mind, upgraded.** A desktop second brain, three instruments deep:
 
-The AI Knowledge Engine (auto-summaries, suggested links, semantic search,
-chat) arrives in upcoming slices — the hover card already reserves its seat.
+- **BRAIN** — your vault as a living neural network: lobes emerge from links,
+  synapses fire, hover previews any thought, five 3D lenses.
+- **DASHBOARD** — the analytics command center: maturity score, 52-week
+  activity heatmap, streaks, growth trends off a daily snapshot store,
+  cluster/tag breakdowns, open tasks.
+- **SKILLS (CORTEX)** — an RPG constellation of 34 skills across 7 branches,
+  every unlock earned from real vault + usage data; XP, levels, titles. The
+  INTELLIGENCE branch sits visibly locked until the Knowledge Engine
+  (Claude API key) arrives.
+
+Daily drivers: **Ctrl+K** command palette (fuzzy fly-to-thought), **Ctrl+D**
+daily notes, **Ctrl+Shift+N** quick capture into today's log, pins, vault-wide
+task list. Cinematic boot sequence, live status bar (FPS/clock/version),
+Iron-Man glass chrome throughout. All local-first; zero telemetry; the AI
+enrichment layer arrives in upcoming slices.
 
 ## Run
 
