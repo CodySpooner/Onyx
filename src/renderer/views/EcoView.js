@@ -213,7 +213,7 @@ export class EcoView {
     const h = container.clientHeight || 800
 
     this.scene = new THREE.Scene()
-    this.scene.fog = new THREE.FogExp2(0x0a1018, 0.0028)
+    this.scene.fog = new THREE.FogExp2(0x0a1018, 0.0016)
     this.scene.add(makeNebula('#1a2a4d', '#0e1c36'))
     this.stars = makeStarfield(900)
     this.scene.add(this.stars)
@@ -225,7 +225,7 @@ export class EcoView {
     this.scene.add(this.sun)
 
     this.camera = new THREE.PerspectiveCamera(52, w / h, 0.1, 3000)
-    this.camera.position.set(0, 120, 260)
+    this.camera.position.set(0, 210, 420)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(w, h)
@@ -235,7 +235,7 @@ export class EcoView {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
     this.controls.maxPolarAngle = 1.45
-    this.controls.maxDistance = 480
+    this.controls.maxDistance = 640
 
     const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.5, 0.5, 0.5] })
     this.composer = cine.composer
@@ -307,7 +307,7 @@ export class EcoView {
     // ground: the layout drawn as a map
     this.groundTex = this._groundTexture()
     this.ground = new THREE.Mesh(
-      new THREE.CircleGeometry(260, 48),
+      new THREE.CircleGeometry(330, 48),
       new THREE.MeshStandardMaterial({ map: this.groundTex, roughness: 0.9, metalness: 0 })
     )
     this.ground.rotation.x = -Math.PI / 2
@@ -477,7 +477,7 @@ export class EcoView {
     const c = document.createElement('canvas')
     c.width = c.height = s
     const ctx = c.getContext('2d')
-    const px = (v) => (v / 520 + 0.5) * s
+    const px = (v) => (v / 660 + 0.5) * s
     ctx.fillStyle = '#0d1a12'
     ctx.fillRect(0, 0, s, s)
     // mowed rings
@@ -503,14 +503,14 @@ export class EcoView {
     // plaza stone
     ctx.fillStyle = '#2e3440'
     ctx.beginPath()
-    ctx.arc(s / 2, s / 2, (14 / 520) * s, 0, Math.PI * 2)
+    ctx.arc(s / 2, s / 2, (14 / 660) * s, 0, Math.PI * 2)
     ctx.fill()
     // district pads tinted by folder color
     for (const d of this.districts) {
       ctx.fillStyle = d.color
       ctx.globalAlpha = 0.12
       ctx.beginPath()
-      ctx.arc(px(d.cx), px(d.cz), ((d.S * 1.9) / 520) * s, 0, Math.PI * 2)
+      ctx.arc(px(d.cx), px(d.cz), ((d.S * 1.9) / 660) * s, 0, Math.PI * 2)
       ctx.fill()
       ctx.globalAlpha = 1
     }
