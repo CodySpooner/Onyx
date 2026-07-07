@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { makeEnv, makeComposer } from '../lib/cinema.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs } from '../lib/scenery.js'
@@ -45,10 +46,11 @@ export class CoreView {
     this.controls.target.set(0, 6, 0)
     this.controls.maxDistance = 600
 
-    this.composer = new EffectComposer(this.renderer)
-    this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.5, 0.3)
-    this.composer.addPass(this.bloom)
+    const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.65, 0.5, 0.3] })
+    this.composer = cine.composer
+    this.grade = cine.grade
+    this.envTex = makeEnv(this.renderer)
+    this.scene.environment = this.envTex
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -210,6 +212,7 @@ export class CoreView {
     if (this.core) this.core.scale.setScalar(pulse)
     this._fadeLabels(150, 236)
     this.controls.update()
+    if (this.grade) this.grade.uniforms.time.value = this._t
     this.composer.render()
   }
 
@@ -256,6 +259,7 @@ export class CoreView {
     window.removeEventListener('resize', this._onResize)
     this._clear()
     this.controls.dispose()
+    this.envTex?.dispose()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement)

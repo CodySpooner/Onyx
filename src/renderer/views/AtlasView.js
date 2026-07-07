@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { makeEnv, makeComposer } from '../lib/cinema.js'
 import { detectClusters, CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs, softDot } from '../lib/scenery.js'
@@ -54,9 +55,11 @@ export class AtlasView {
     this.controls.maxPolarAngle = Math.PI / 2.4 // stays a map, never goes under the sea
     this.controls.maxDistance = 1800
 
-    this.composer = new EffectComposer(this.renderer)
-    this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.5, 0.3))
+    const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.65, 0.5, 0.3] })
+    this.composer = cine.composer
+    this.grade = cine.grade
+    this.envTex = makeEnv(this.renderer)
+    this.scene.environment = this.envTex
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -296,6 +299,7 @@ export class AtlasView {
     }
 
     this.controls.update()
+    if (this.grade) this.grade.uniforms.time.value = this._t
     this.composer.render()
   }
 
@@ -349,6 +353,7 @@ export class AtlasView {
     clearTimeout(this._clickTimer)
     this._clear()
     this.controls.dispose()
+    this.envTex?.dispose()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement)

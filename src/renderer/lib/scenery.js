@@ -51,12 +51,21 @@ function shapeFor(type) {
 export function makeOrb(colorHex, size, type, id) {
   const kind = shapeFor(type)
   const color = new THREE.Color(colorHex)
-  const mat = new THREE.MeshStandardMaterial({
+  // physical gems: clearcoat + iridescence read as cut stones under the
+  // PMREM environment (cinema.js). NO transmission — it would re-render the
+  // whole scene per frame, a killer on integrated GPUs.
+  const mat = new THREE.MeshPhysicalMaterial({
     color,
-    emissive: color.clone().multiplyScalar(0.45),
-    emissiveIntensity: 0.9,
-    roughness: 0.32,
-    metalness: 0.16,
+    emissive: color.clone().multiplyScalar(0.35),
+    emissiveIntensity: 0.7,
+    roughness: 0.22,
+    metalness: 0.1,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.08,
+    iridescence: 0.35,
+    iridescenceIOR: 1.6,
+    iridescenceThicknessRange: [140, 450],
+    envMapIntensity: 1.25,
     flatShading: kind !== 'sphere'
   })
   const mesh = new THREE.Mesh(unitGeometry(kind), mat)

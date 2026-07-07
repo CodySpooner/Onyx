@@ -3,6 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { makeEnv, makeComposer } from '../lib/cinema.js'
 import { makeLabel } from '../lib/label.js'
 import { addLights, makeStarfield, makeNebula, softDot } from '../lib/scenery.js'
 import { districtGrid } from '../lib/layouts.mjs'
@@ -112,9 +113,11 @@ export class ArchiveCityView {
     this.controls.maxPolarAngle = 1.45 // drone stays above the deck
     this.controls.maxDistance = 520
 
-    this.composer = new EffectComposer(this.renderer)
-    this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.75, 0.5, 0.28))
+    const cine = makeComposer(this.renderer, this.scene, this.camera, { w, h, bloom: [0.75, 0.5, 0.28] })
+    this.composer = cine.composer
+    this.grade = cine.grade
+    this.envTex = makeEnv(this.renderer)
+    this.scene.environment = this.envTex
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -411,6 +414,7 @@ export class ArchiveCityView {
     }
 
     this.controls.update()
+    if (this.grade) this.grade.uniforms.time.value = this._t
     this.composer.render()
   }
 
@@ -467,6 +471,7 @@ export class ArchiveCityView {
     window.removeEventListener('resize', this._onResize)
     this._clear()
     this.controls.dispose()
+    this.envTex?.dispose()
     this.renderer.dispose()
     if (this.renderer.domElement.parentNode === this.container) {
       this.container.removeChild(this.renderer.domElement)
