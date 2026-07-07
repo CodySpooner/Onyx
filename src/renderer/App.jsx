@@ -381,7 +381,7 @@ export default function App() {
     const raw = await window.onyx.readNote(src)
     if (raw == null) {
       bus.emit('toast', { msg: '✕ could not read note — link aborted', kind: 'err' })
-      return
+      return false
     }
     // wikilinks resolve by FILENAME (here and in Obsidian) — link the basename,
     // carry the pretty title as an alias when they differ
@@ -389,12 +389,12 @@ export default function App() {
     const next = insertWikilink(raw, base, s.mention, titleOf(dst))
     if (next === raw) {
       dismissSuggestion(s) // already linked by hand — retire the suggestion
-      return
+      return 'already'
     }
     const ok = await window.onyx.writeNote(src, next)
     if (!ok) {
       bus.emit('toast', { msg: '✕ could not write note', kind: 'err' })
-      return
+      return false
     }
     dismissSuggestion(s)
     window.onyx.bumpUsage?.('linkAccept').then(setUsage)
@@ -416,6 +416,7 @@ export default function App() {
         }
       }
     })
+    return true
   }
 
   const due = graph?.cards ? dueCards(graph.cards, srs, Date.now()) : []
@@ -431,35 +432,49 @@ export default function App() {
     setOverlay('triage')
   }
   const acceptFromTriage = async (s) => {
-    await acceptSuggestion(s)
-    window.onyx.bumpUsage?.('orphanLinked').then(setUsage)
+    const ok = await acceptSuggestion(s)
+    if (ok === true) window.onyx.bumpUsage?.('orphanLinked').then(setUsage)
+    return ok // 'already' still advances the queue; false keeps the orphan up
   }
 
   // content-guarded task toggle (CORTEX §10): re-read at click, exact-line
-  // match or single relocation, refuse-on-ambiguity — never guess in a vault
-  const toggleTaskAt = async (t) => {
+  // match or single relocation, refuse-on-ambiguity — never guess in a vault.
+  // All toggles run through ONE promise chain: two clicks in the same note
+  // must not both read the pre-write content (write-from-stale-state race).
+  const taskChain = useRef(Promise.resolve())
+  const unpend = (key) =>
+    setPendingTasks((p) => {
+      const n = new Set(p)
+      n.delete(key)
+      return n
+    })
+  const doToggle = async (t, key) => {
     const raw = await window.onyx.readNote(t.noteId)
     if (raw == null) {
+      unpend(key)
       bus.emit('toast', { msg: '✕ could not read note — toggle aborted', kind: 'err' })
       return
     }
     const res = toggleTask(raw, t.line, t.raw)
     if (!res) {
+      unpend(key)
       bus.emit('toast', { msg: '✕ task moved — note changed on disk, try again', kind: 'err' })
       return
     }
-    setPendingTasks((p) => new Set(p).add(`${t.noteId}:${t.line}`))
     const ok = await window.onyx.writeNote(t.noteId, res.next)
     if (!ok) {
-      setPendingTasks((p) => {
-        const n = new Set(p)
-        n.delete(`${t.noteId}:${t.line}`)
-        return n
-      })
+      unpend(key)
       bus.emit('toast', { msg: '✕ could not write note', kind: 'err' })
       return
     }
     if (res.nowDone) window.onyx.bumpUsage?.('taskComplete').then(setUsage)
+    // pending key resolves when the writeNote-triggered reindex lands
+  }
+  const toggleTaskAt = (t) => {
+    const key = `${t.noteId}:${t.line}`
+    if (pendingTasks.has(key)) return
+    setPendingTasks((p) => new Set(p).add(key)) // sync — double-clicks go inert
+    taskChain.current = taskChain.current.then(() => doToggle(t, key)).catch(() => {})
   }
   const handleGrade = (card, g) => {
     const next = { ...srs, [card.hash]: grade(srs[card.hash], g, Date.now()) }

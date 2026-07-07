@@ -33,13 +33,17 @@ export function TriageModal({ queue, graph, onAccept, onOpen, onClose }) {
   const accept = async (candidate) => {
     if (busy || !candidate) return
     setBusy(true)
-    await onAccept(candidate)
+    const ok = await onAccept(candidate)
     setBusy(false)
-    advance()
+    if (ok) advance() // failed write → stay on this orphan so the user can retry
   }
 
   useEffect(() => {
     const onKey = (e) => {
+      // modifier combos (Ctrl+1/2/3 mode switch, Ctrl+S reflex) and typing
+      // fields must never be swallowed into a vault write
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return
       if (e.key === 'Escape') {
         e.stopPropagation()
         return onClose()

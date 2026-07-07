@@ -6,7 +6,7 @@ import { degree, cleanFolder } from '../lib/stats.mjs'
 const uniq = (a) => [...new Set(a.filter(Boolean))].sort()
 
 export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [], dueCount = 0, onReview, selected = null, matchCount = null, onToggleTask, pendingTasks }) {
-  const filtering = filter.q || filter.types.length || filter.tags.length || filter.folders.length || filter.statuses.length
+  const filtering = Boolean(filter.q || filter.types.length || filter.tags.length || filter.folders.length || filter.statuses.length)
   const facets = useMemo(
     () => ({
       types: uniq(graph.notes.map((n) => n.type)),
@@ -14,6 +14,9 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
     }),
     [graph]
   )
+  // display-only: a hub with zero links isn't a hub (stats.hubs is unfiltered
+  // because App uses hubs[0] as the featured-node fallback)
+  const hubs = useMemo(() => stats.hubs.filter((n) => degree(n) > 0), [stats])
   const colorOf = (fid) => (graph.folders.find((f) => f.id === fid) || {}).color || '#8fa2d9'
   const toggle = (k, v) => {
     const s = new Set(filter[k])
@@ -135,8 +138,8 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
 
       <div className="hud-sec hubs">
         <div className="sec-h">TOP HUBS</div>
-        {stats.hubs.length === 0 && <div className="sec-empty">no hubs yet — link notes with [[wikilinks]]</div>}
-        {stats.hubs.slice(0, 12).map((n) => (
+        {hubs.length === 0 && <div className="sec-empty">no hubs yet — link notes with [[wikilinks]]</div>}
+        {hubs.slice(0, 12).map((n) => (
           <button key={n.id} className={`hubrow${n.id === selected ? ' sel' : ''}`} onClick={() => onSelect(n.id)}>
             <i style={{ background: colorOf(n.folder) }} />
             <span className="hub-t">{n.title}</span>

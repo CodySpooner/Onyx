@@ -117,6 +117,10 @@ ipcMain.handle('vault:writeNote', async (_e, id, content) => {
   const { vaultPath } = loadConfig()
   try {
     await writeNoteRaw(vaultPath, id, content)
+    // don't rely on chokidar (flaky on OneDrive): reindex + broadcast now so
+    // optimistic UI (pending task marks) always resolves
+    const g = await reindex()
+    if (g) win?.webContents.send('vault:update', g)
     return true
   } catch (e) {
     console.error('writeNote failed:', e)
