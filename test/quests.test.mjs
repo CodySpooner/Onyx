@@ -67,3 +67,9 @@ test('activeDays weekly counts only active days since weekStart', () => {
   const days = { '2026-07-06': 3, '2026-07-07': 1, '2026-07-01': 9 } // Jul 1 is last week
   assert.equal(questValue(q, usage({}, days), s.weekStart), 2)
 })
+
+test('project-log quest completes on projectLogEdit delta with base capture', () => {
+  const q = { id: 'project-log-1', metrics: ['projectLogEdit'], target: 1, base: 5 }
+  assert.equal(questValue(q, usage({ projectLogEdit: 5 }), '2026-07-06'), 0)
+  assert.equal(questValue(q, usage({ projectLogEdit: 6 }), '2026-07-06'), 1)
+})

@@ -49,11 +49,21 @@ function watchVault() {
   watcher = null
   if (!vaultPath) return
   let t
+  let sawProjectLog = false
   watcher = chokidar.watch(vaultPath, { ignoreInitial: true, ignored: /(^|[/\\])\../ })
-  const bump = () => {
+  const bump = (p) => {
+    // agent edits to project logs fuel the quest counter (digest _AGENT.md
+    // excluded so exporting can't self-complete it)
+    if (/[\\/]Claude Projects[\\/][^\\/]+\.md$/.test(String(p || '')) && !String(p).split(/[\\/]/).pop().startsWith('_')) {
+      sawProjectLog = true
+    }
     clearTimeout(t)
     t = setTimeout(async () => {
       bumpUsage('vaultEdit') // Obsidian edits count toward streaks too
+      if (sawProjectLog) {
+        bumpUsage('projectLogEdit')
+        sawProjectLog = false
+      }
       const g = await reindex()
       if (g) win?.webContents.send('vault:update', g)
     }, 300)

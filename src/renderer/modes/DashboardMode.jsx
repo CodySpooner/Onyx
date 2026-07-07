@@ -16,8 +16,10 @@ import {
   clusterBreakdown, topTags, recentNotes, relAge, linkHealth
 } from '../lib/dashboard.mjs'
 import { folderWordTrend, linkMatrix, tagMomentum, duplicateTitles } from '../lib/insights.mjs'
+import { collectProjects, lastDoneDate, isStale, buildAgentDigest, canOverwriteDigest, DIGEST_ID, PROJECT_FOLDER } from '../lib/projects.mjs'
+import { bus } from '../lib/bus.mjs'
 
-const PAGES = ['overview', 'today', 'analytics', 'health']
+const PAGES = ['overview', 'today', 'projects', 'analytics', 'health']
 
 function DeltaChip({ v, label }) {
   if (v == null) return <span className="dchip collecting">{label} —</span>
@@ -240,6 +242,41 @@ export function DashboardMode({
       momentum: tagMomentum(graph.notes, now)
     }
   }, [graph, page])
+  // PROJECTS page: bridge logs + agent digest
+  const projects = useMemo(() => (page === 'projects' ? collectProjects(graph.notes) : null), [graph, page])
+  const [bridge, setBridge] = useState(null)
+  useEffect(() => {
+    if (page !== 'projects') return
+    window.onyx.getInstalledSkills?.().then((r) => setBridge(!!r?.skills?.some((s) => s.source === 'user' && s.name === 'onyx-bridge')))
+  }, [page])
+  const [appVersion, setAppVersion] = useState('0.0.0')
+  useEffect(() => {
+    window.onyx.getVersion?.().then((v) => v && setAppVersion(v))
+  }, [])
+  const exportDigest = async () => {
+    const md = buildAgentDigest({ graph, now: Date.now(), version: appVersion })
+    const r = await window.onyx.ensureNote?.(DIGEST_ID, md)
+    if (r?.created) {
+      bus.emit('toast', { msg: '⇪ agent digest exported', kind: 'skill' })
+      return
+    }
+    if (r == null) {
+      bus.emit('toast', { msg: '✕ digest export failed — vault not writable', kind: 'err' })
+      return
+    }
+    const cur = await window.onyx.readNote(DIGEST_ID)
+    if (cur == null) {
+      bus.emit('toast', { msg: '✕ digest unreadable — try again', kind: 'err' })
+      return
+    }
+    if (!canOverwriteDigest(cur)) {
+      bus.emit('toast', { msg: '✕ refusing: _AGENT.md was hand-edited — delete it to re-enable export', kind: 'err' })
+      return
+    }
+    const ok = await window.onyx.writeNote(DIGEST_ID, md)
+    bus.emit('toast', ok ? { msg: '⇪ agent digest exported', kind: 'skill' } : { msg: '✕ digest export failed', kind: 'err' })
+  }
+
   const healthCalcs = useMemo(() => {
     if (page !== 'health') return null
     const now = Date.now()
@@ -666,6 +703,71 @@ export function DashboardMode({
     </>
   )
 
+  const renderProjects = () => (
+    <>
+      <section className="dpanel brk panel-in span12" style={{ '--i': 0 }}>
+        <div className="proj-bridge">
+          <span className={`u-label ${bridge ? 'ok' : bridge === false ? '' : ''}`}>
+            BRIDGE {bridge == null ? '—' : bridge ? '●' : '○'}
+          </span>
+          <span className="dp-sub">
+            {bridge == null
+              ? 'checking for the onyx-bridge skill…'
+              : bridge
+                ? 'onyx-bridge installed — Claude sessions log to this vault and never redo finished steps'
+                : 'onyx-bridge skill missing — install it in ~/.claude/skills so agents keep project logs here'}
+          </span>
+          <span className="ns-spacer" />
+          <button className="hud-new" onClick={exportDigest} data-tip="Writes Claude Projects/_AGENT.md — one file an agent reads to orient. Refuses to overwrite hand-edited files.">
+            ⇪ EXPORT AGENT DIGEST
+          </button>
+        </div>
+      </section>
+      {(projects || []).map((n, i) => {
+        const log = n.projectLog
+        const last = lastDoneDate(log)
+        const stale = isStale(log, n.mtime, d.now, 7)
+        return (
+          <section key={n.id} className="dpanel brk panel-in span6" style={{ '--i': i + 1 }}>
+            <div className="proj-head">
+              <span className="u-label">{n.title.toUpperCase()}</span>
+              <span className="dchip">{log.decisions.length} DECISIONS</span>
+              <span className="ns-spacer" />
+              <button className="sg-link" onClick={() => onSelect(n.id)}>OPEN</button>
+            </div>
+            <div className="rule-ticks" />
+            {log.status && <div className="proj-status">{log.status}</div>}
+            {last && (
+              <div className="dp-sub num">
+                last done {last} — {log.done.filter((x) => x.date === last).pop()?.text?.slice(0, 90)}
+              </div>
+            )}
+            {stale && <div className="dp-warn">no Done entry in 7d — project going cold</div>}
+            {log.next.length > 0 && (
+              <>
+                <div className="u-label" style={{ marginTop: 8 }}>NEXT</div>
+                {log.next.slice(0, 5).map((x, k) => (
+                  <div key={k} className="proj-next">▹ {x}</div>
+                ))}
+                {log.next.length > 5 && <div className="task-more u-label">+{log.next.length - 5} MORE</div>}
+              </>
+            )}
+          </section>
+        )
+      })}
+      {projects && !projects.length && (
+        <section className="dpanel brk panel-in span12" style={{ '--i': 1 }}>
+          <div className="u-label">NO PROJECT LOGS YET</div>
+          <div className="rule-ticks" />
+          <p className="dp-sub">
+            Agents (and you) keep one note per project in “{PROJECT_FOLDER}/” with ## Status, ## Done, ## Next and
+            ## Decisions. The onyx-bridge skill creates and maintains them automatically when Claude works on your projects.
+          </p>
+        </section>
+      )}
+    </>
+  )
+
   return (
     <div className="mode-scrim dash-scrim">
       <div className="dash-tabs">
@@ -679,6 +781,7 @@ export function DashboardMode({
       <div className="dash-grid">
         {page === 'overview' && renderOverview()}
         {page === 'today' && renderToday()}
+        {page === 'projects' && renderProjects()}
         {page === 'analytics' && renderAnalytics()}
         {page === 'health' && renderHealth()}
       </div>

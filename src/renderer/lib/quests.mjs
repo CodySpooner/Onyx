@@ -17,7 +17,8 @@ export const DAILY_POOL = [
   { id: 'orphan-1', label: 'Rescue an orphan note', metrics: ['orphanLinked'], target: 1, xp: 25 },
   { id: 'links-2', label: 'Accept 2 link suggestions', metrics: ['linkAccept'], target: 2, xp: 25 },
   { id: 'pomodoro-1', label: 'Finish a pomodoro', metrics: ['pomodorosCompleted'], target: 1, xp: 25 },
-  { id: 'edit-3', label: 'Edit 3 notes', metrics: ['noteEdit'], target: 3, xp: 25 }
+  { id: 'edit-3', label: 'Edit 3 notes', metrics: ['noteEdit'], target: 3, xp: 25 },
+  { id: 'project-log-1', label: 'Update a project log', metrics: ['projectLogEdit'], target: 1, xp: 25 }
 ]
 
 export const WEEKLY_POOL = [
