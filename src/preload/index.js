@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('onyx', {
     return () => ipcRenderer.removeListener('vault:update', h)
   },
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  checkUpdates: () => ipcRenderer.invoke('update:check'),
   getVersion: () => ipcRenderer.invoke('app:version'),
   getUsage: () => ipcRenderer.invoke('usage:get'),
   bumpUsage: (name, n) => ipcRenderer.invoke('usage:bump', name, n),

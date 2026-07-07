@@ -23,7 +23,21 @@ export function setupUpdater(win) {
 
   const check = () => autoUpdater.checkForUpdates().catch(() => {})
   check()
-  setInterval(check, 3 * 60 * 60 * 1000) // re-check every 3 hours
+  // 30 min, not hours: a long-open app should never be releases behind
+  setInterval(check, 30 * 60 * 1000)
+}
+
+// manual "check now" (palette) — returns a result the renderer can toast
+export async function checkUpdatesNow() {
+  if (!app.isPackaged) return { status: 'dev', current: app.getVersion() }
+  try {
+    const r = await autoUpdater.checkForUpdates()
+    const current = app.getVersion()
+    const next = r?.updateInfo?.version
+    return { status: next && next !== current ? 'found' : 'latest', version: next, current }
+  } catch (e) {
+    return { status: 'error', message: String(e && e.message ? e.message : e) }
+  }
 }
 
 export function installUpdate() {

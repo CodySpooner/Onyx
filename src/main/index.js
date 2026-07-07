@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
 import { scanVault, readNoteRaw, writeNoteRaw, createNote, deleteNote, renameNote, ensureNote } from './vault-indexer.mjs'
 import { loadConfig, saveConfig } from './config.js'
-import { setupUpdater, installUpdate } from './updater.js'
+import { setupUpdater, installUpdate, checkUpdatesNow } from './updater.js'
 import { loadUsage, bumpUsage, markUnlocked, loadSnapshots, recordSnapshot, flush } from './appdata.js'
 import { scanInstalledSkills } from './claude-skills.js'
 import { storeGet, storeSet } from './store.js'
@@ -158,6 +158,7 @@ ipcMain.handle('vault:renameNote', async (_e, id, title) => {
 ipcMain.handle('config:get', () => loadConfig())
 ipcMain.handle('config:set', (_e, patch) => saveConfig(patch))
 ipcMain.handle('update:install', () => installUpdate())
+ipcMain.handle('update:check', () => checkUpdatesNow())
 ipcMain.handle('app:version', () => app.getVersion())
 ipcMain.handle('usage:get', () => loadUsage())
 ipcMain.handle('usage:bump', (_e, name, n) => bumpUsage(name, n))

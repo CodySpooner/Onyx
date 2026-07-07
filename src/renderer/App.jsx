@@ -562,6 +562,20 @@ export default function App() {
     ...(due.length ? [{ label: `Review due cards (${due.length})`, hint: 'srs', run: openReview }] : []),
     ...(stats?.orphans ? [{ label: `Triage orphans (${stats.orphans})`, hint: 'inbox', run: openTriage }] : []),
     { label: 'Find & replace in vault', hint: 'Ctrl+Shift+H', run: () => setOverlay('findreplace') },
+    {
+      label: 'Check for updates now',
+      hint: 'updater',
+      run: async () => {
+        bus.emit('toast', { msg: '◌ checking for updates…', ttl: 2000 })
+        const r = await window.onyx.checkUpdates?.()
+        const msg =
+          r?.status === 'latest' ? `✓ you're on the latest (v${r.current})`
+          : r?.status === 'found' ? `◆ v${r.version} found — downloading now`
+          : r?.status === 'dev' ? 'dev build — the updater runs in the installed app only'
+          : `✕ update check failed — ${r?.message || 'unknown'}`
+        bus.emit('toast', { msg, kind: r?.status === 'error' ? 'err' : r?.status === 'found' ? 'skill' : 'info', ttl: 6000 })
+      }
+    },
     ...(selected
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
