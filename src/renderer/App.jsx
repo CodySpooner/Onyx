@@ -65,7 +65,7 @@ export default function App() {
   const [triageRows, setTriageRows] = useState([])
   const [pendingTasks, setPendingTasks] = useState(() => new Set())
   const [quests, setQuests] = useState(null)
-  const questsLoaded = useRef(false)
+  const [questsLoaded, setQuestsLoaded] = useState(false)
   const lastOpened = useRef(null)
   const announced = useRef(new Set()) // unlock toasts already shown this session
 
@@ -103,13 +103,13 @@ export default function App() {
     })
     window.onyx.storeGet?.('quests').then((qs) => {
       setQuests(qs || null)
-      questsLoaded.current = true
+      setQuestsLoaded(true) // state, not ref: the boot tick must re-run when this lands
     })
   }, [])
 
-  // quests tick on every usage change: rollover, latch completions, award XP
+  // quests tick at boot and on every usage change: rollover, latch, award XP
   useEffect(() => {
-    if (!questsLoaded.current || !usage) return
+    if (!questsLoaded || !usage) return
     setQuests((prev) => {
       const { state, completed, changed } = tickQuests(prev, usage, Date.now())
       if (completed.length) {
@@ -118,7 +118,7 @@ export default function App() {
       if (changed) window.onyx.storeSet?.('quests', state)
       return changed ? state : prev
     })
-  }, [usage])
+  }, [usage, questsLoaded])
 
   const rerollDaily = (questId) => {
     setQuests((prev) => {
@@ -336,6 +336,7 @@ export default function App() {
     if (m === kbRef.current.mode) return
     if (!guardDirty()) return
     kbRef.current.dirty = false
+    setFocusMode(false) // stale focus over a non-brain mode blanks the screen
     setMode(m)
   }
   kbRef.current.changeMode = changeMode
@@ -359,6 +360,8 @@ export default function App() {
   }
   kbRef.current.goBack = goBack
   const openDaily = async (date = null) => {
+    if (!guardDirty()) return // guard BEFORE the vault write and the counter bump
+    kbRef.current.dirty = false
     const folder = cfg?.dailyFolder || '06 - Daily Logs'
     const now = date instanceof Date ? date : new Date() // guards click-event args
     const id = dailyId(now, folder)
@@ -590,7 +593,7 @@ export default function App() {
     { label: 'Mode: Notes', hint: 'Ctrl+2', run: () => changeMode('notes') },
     { label: 'Mode: Dashboard', hint: 'Ctrl+3', run: () => changeMode('dashboard') },
     { label: 'Mode: Skills', hint: 'Ctrl+4', run: () => changeMode('skills') },
-    ...(selected ? [{ label: 'Toggle focus mode', hint: 'F', run: () => setFocusMode((f) => !f) }] : []),
+    ...(selected && mode === 'brain' ? [{ label: 'Toggle focus mode', hint: 'F', run: () => setFocusMode((f) => !f) }] : []),
     {
       label: 'Resurface a thought',
       hint: 'serendipity',

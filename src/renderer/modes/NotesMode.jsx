@@ -90,10 +90,11 @@ export function NotesMode({ graph, selected, pins, dailyFolder, templates, onOpe
     })
   }
   const onListKey = (e) => {
-    if (e.key === 'ArrowDown' || e.key === 'j') {
+    const inInput = e.target.tagName === 'INPUT' // j/k must stay typable in the filter
+    if (e.key === 'ArrowDown' || (e.key === 'j' && !inInput)) {
       e.preventDefault()
       moveCursor(1)
-    } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    } else if (e.key === 'ArrowUp' || (e.key === 'k' && !inInput)) {
       e.preventDefault()
       moveCursor(-1)
     } else if (e.key === 'Enter') {
@@ -230,25 +231,29 @@ export function NotesMode({ graph, selected, pins, dailyFolder, templates, onOpe
       </section>
 
       {/* ── editor column ── */}
+      {/* gated on `selected`, NOT `note`: a reindex that drops the id (rename
+          in Obsidian, OneDrive sync) must never unmount a dirty draft */}
       <section className="notes-editor">
-        {note ? (
+        {selected ? (
           <>
+            {note && (
             <div className="notes-crumb glass">
               <i className="nr-dot" style={{ background: folderById.get(note.folder)?.color || '#4a5470' }} />
               <span className="nc-folder">{cleanFolder(note.folder)}</span>
               <span className="nc-sep">›</span>
               <span className="nc-title">{note.title}</span>
               <span className="nc-spacer" />
-              <button className="nc-fly" onClick={() => onFlyTo(note.id)} data-tip="See this note in the 3D brain">
+              <button className="nc-fly" onClick={() => onFlyTo(selected)} data-tip="See this note in the 3D brain">
                 ◍ FLY TO BRAIN
               </button>
             </div>
+            )}
             <NoteReader
-              key={note.id}
-              id={note.id}
+              key={selected}
+              id={selected}
               docked
-              pinned={pins.includes(note.id)}
-              onTogglePin={() => onTogglePin(note.id)}
+              pinned={pins.includes(selected)}
+              onTogglePin={() => onTogglePin(selected)}
               onClose={onClose}
               {...readerProps}
               onEditingChange={(d, draft) => {
@@ -258,13 +263,17 @@ export function NotesMode({ graph, selected, pins, dailyFolder, templates, onOpe
             />
             <div className="notes-status glass">
               <span className="num">
-                {draftText != null ? `${countWords(draftText)} words · editing` : `${(note.wordCount || 0).toLocaleString()} words · ${Math.max(1, Math.ceil((note.wordCount || 0) / 200))} min`}
+                {draftText != null
+                  ? `${countWords(draftText)} words · editing`
+                  : note
+                    ? `${(note.wordCount || 0).toLocaleString()} words · ${Math.max(1, Math.ceil((note.wordCount || 0) / 200))} min`
+                    : 'note missing from index — draft preserved'}
               </span>
-              {draftText == null && (note.tasks || []).filter((t) => !t.done).length > 0 && (
+              {draftText == null && note && (note.tasks || []).filter((t) => !t.done).length > 0 && (
                 <span className="num">{(note.tasks || []).filter((t) => !t.done).length} open tasks</span>
               )}
               <span className="ns-spacer" />
-              <span className="u-label">{note.id}</span>
+              <span className="u-label">{selected}</span>
             </div>
           </>
         ) : (

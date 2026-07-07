@@ -716,7 +716,7 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 }
 
 /* ════════════════ NEXUS: NOTES mode — rail · list · docked reader ════════════════ */
-.notes-mode { display: grid; grid-template-columns: 232px 324px 1fr; gap: 10px; padding: 62px 14px 46px; overflow: hidden; background: rgba(9, 9, 11, 0.72); backdrop-filter: blur(6px); }
+.notes-mode { display: grid; grid-template-columns: minmax(150px, 232px) minmax(200px, 324px) minmax(280px, 1fr); gap: 10px; padding: 62px 14px 46px; overflow: hidden; background: rgba(9, 9, 11, 0.72); backdrop-filter: blur(6px); }
 
 .notes-rail { border-radius: 12px; padding: 10px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .nr-row { display: flex; align-items: center; gap: 8px; width: 100%; background: transparent; border: none; border-radius: 7px; color: var(--text-dim); font: 500 11px/1.2 var(--font-mono); letter-spacing: 0.05em; padding: 7px 10px; cursor: pointer; text-align: left; }

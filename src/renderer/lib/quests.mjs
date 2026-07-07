@@ -45,7 +45,9 @@ const activeDaysSince = (usage, weekStart) =>
   Object.entries(usage?.days || {}).filter(([k, v]) => k >= weekStart && v > 0).length
 
 function instantiate(q, usage, weekStart) {
-  const base = q.kind === 'activeDays' ? activeDaysSince(usage, weekStart) : counterSum(usage, q.metrics)
+  // activeDays is calendar-bounded by weekStart already — capturing a base
+  // would make the quest unwinnable when generated mid-week
+  const base = q.kind === 'activeDays' ? 0 : counterSum(usage, q.metrics)
   return { ...q, base, done: false, doneAt: null }
 }
 

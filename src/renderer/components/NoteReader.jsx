@@ -11,8 +11,14 @@ function Outline({ raw, bodyRef }) {
   const heads = useMemo(() => extractOutline(raw || ''), [raw])
   const [open, setOpen] = useState(true)
   if (heads.length < 2) return null
-  const jump = (ord) => {
-    const el = bodyRef.current?.querySelectorAll('h1,h2,h3,h4,h5,h6')[ord]
+  // match by TEXT (nearest to expected ordinal for duplicates) — raw-HTML or
+  // blockquote headings in the note would desync a pure ordinal lookup
+  const jump = (h) => {
+    const els = [...(bodyRef.current?.querySelectorAll('h1,h2,h3,h4,h5,h6') || [])]
+    const hits = els.filter((el) => el.textContent.trim() === h.text)
+    const el = hits.length
+      ? hits.reduce((a, b) => (Math.abs(els.indexOf(b) - h.ord) < Math.abs(els.indexOf(a) - h.ord) ? b : a))
+      : els[h.ord]
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   return (
@@ -23,7 +29,7 @@ function Outline({ raw, bodyRef }) {
       {open && (
         <div className="ol-rows">
           {heads.map((h) => (
-            <button key={h.ord} className="ol-row" style={{ paddingLeft: 8 + (h.level - 1) * 12 }} onClick={() => jump(h.ord)}>
+            <button key={h.ord} className="ol-row" style={{ paddingLeft: 8 + (h.level - 1) * 12 }} onClick={() => jump(h)}>
               {h.text}
             </button>
           ))}

@@ -114,6 +114,8 @@ export async function scanVault(vaultPath) {
     WIKILINK.lastIndex = 0
     while ((m = WIKILINK.exec(note._content))) {
       const target = m[1].split('|')[0].split('#')[0].trim()
+      // attachment embeds aren't broken NOTE links — keep HEALTH honest
+      if (/\.(png|jpe?g|gif|webp|svg|bmp|avif|pdf|mp3|mp4|wav|ogg|webm|mov|zip|canvas|excalidraw|base)$/i.test(target)) continue
       const targetId = byBasename.get(target.toLowerCase())
       if (targetId && targetId !== note.id) targets.add(targetId)
       else if (!targetId && !missed.has(target.toLowerCase())) {

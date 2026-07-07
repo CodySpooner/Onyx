@@ -20,6 +20,13 @@ export function FindReplaceModal({ graph, onClose }) {
     dead.current = true
   }, [])
 
+  // the preview IS the contract: any change to what we search invalidates it
+  // (repl stays live — typing the replacement after scanning is the workflow)
+  useEffect(() => {
+    setResults(null)
+    setApplied(new Set())
+  }, [term, wholeWord, caseSensitive])
+
   const scan = async () => {
     if (!term.trim() || scanning) return
     setScanning(true)
@@ -126,8 +133,8 @@ export function FindReplaceModal({ graph, onClose }) {
                   {applied.has(r.id) ? (
                     <span className="fnr-applied u-label">APPLIED</span>
                   ) : (
-                    <button className="sg-link" disabled={!repl} onClick={() => apply(r)} title={repl ? 'Replace in this file (undoable)' : 'Enter replacement text first'}>
-                      APPLY
+                    <button className="sg-link" onClick={() => apply(r)} title={repl ? 'Replace in this file (undoable)' : 'Delete matches in this file (undoable)'}>
+                      {repl ? 'APPLY' : 'DELETE'}
                     </button>
                   )}
                 </div>
