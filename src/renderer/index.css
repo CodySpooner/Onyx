@@ -477,3 +477,9 @@ button:hover { background: #26335c; }
 .sb-pomo-main:hover { background: transparent; }
 .sb-pomo-x { background: transparent; border: none; color: var(--text-faint); cursor: pointer; font: inherit; padding: 0 10px 0 4px; }
 .sb-pomo-x:hover { color: var(--err); background: transparent; }
+
+/* resurface (B4) */
+.rs-title { background: transparent; border: none; padding: 0; color: var(--text); font-size: 15px; font-weight: 650; cursor: pointer; text-align: left; }
+.rs-title:hover { color: var(--accent); background: transparent; }
+.rs-go { align-self: flex-start; margin-top: 8px; background: rgba(110,168,255,0.08); border: 1px solid var(--brk); border-radius: 7px; color: var(--accent); font: 500 10px/1 var(--font-mono); letter-spacing: 0.12em; padding: 7px 11px; cursor: pointer; }
+.rs-go:hover { background: rgba(110,168,255,0.14); }

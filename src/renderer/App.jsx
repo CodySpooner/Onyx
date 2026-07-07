@@ -296,6 +296,17 @@ export default function App() {
     { label: 'Mode: Dashboard', hint: 'Ctrl+2', run: () => setMode('dashboard') },
     { label: 'Mode: Skills', hint: 'Ctrl+3', run: () => setMode('skills') },
     ...(selected ? [{ label: 'Toggle focus mode', hint: 'F', run: () => setFocusMode((f) => !f) }] : []),
+    {
+      label: 'Resurface a thought',
+      hint: 'serendipity',
+      run: async () => {
+        const { resurfacePick } = await import('./lib/resurface.mjs')
+        const { dayKey } = await import('./lib/stats.mjs')
+        const now = Date.now()
+        const p = resurfacePick(graph.notes, dayKey(now), now)
+        if (p) openNote(p.note.id)
+      }
+    },
     { label: 'Toggle synapses', hint: 'links', run: toggleLinks },
     { label: 'Toggle labels', hint: 'labels', run: toggleLabels },
     ...(filtering ? [{ label: 'Clear filters', hint: 'reset', run: () => setFilter(EMPTY_FILTER) }] : []),

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Gauge } from '../components/Gauge.jsx'
 import { Heatmap } from '../components/Heatmap.jsx'
 import { TasksPanel } from '../components/TasksPanel.jsx'
+import { ResurfacePanel } from '../components/ResurfacePanel.jsx'
 import { Num } from '../components/chrome.jsx'
 import { maturity, coldNotes, cleanFolder } from '../lib/stats.mjs'
 import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
@@ -245,7 +246,11 @@ export function DashboardMode({ graph, clusters, usage, onSelect, onFilter }) {
         </section>
 
         <section className="dpanel brk panel-in span4" style={{ '--i': 10 }}>
-          <TasksPanel graph={graph} onSelect={onSelect} limit={20} showEmpty />
+          <TasksPanel graph={graph} onSelect={onSelect} limit={16} showEmpty />
+        </section>
+
+        <section className="dpanel brk panel-in span4" style={{ '--i': 11 }}>
+          <ResurfacePanel graph={graph} onSelect={onSelect} />
         </section>
       </div>
     </div>
