@@ -546,6 +546,9 @@ export default function App() {
     return true
   }
 
+  // eco lens: clicking a building filters the brain like a FolderTabs click
+  useEffect(() => bus.on('eco:filter', (folderId) => setFilter({ ...EMPTY_FILTER, folders: [folderId] })), [])
+
   const due = graph?.cards ? dueCards(graph.cards, srs, Date.now()) : []
   // freeze the deck at open time — live `due` shrinks with every grade,
   // which would skip cards / strand the modal if passed directly
@@ -661,6 +664,7 @@ export default function App() {
     { label: 'View: Atlas', hint: 'lens', run: () => { changeMode('brain'); changeView('atlas') } },
     { label: 'View: Stacks', hint: 'lens', run: () => { changeMode('brain'); changeView('stacks') } },
     { label: 'View: Archive City', hint: 'lens', run: () => { changeMode('brain'); changeView('city') } },
+    { label: 'View: Ecosystem', hint: 'lens', run: () => { changeMode('brain'); changeView('eco') } },
     { label: 'View: Solar System', hint: 'lens', run: () => { changeMode('brain'); changeView('solar') } },
     { label: 'View: Core of Everything', hint: 'lens', run: () => { changeMode('brain'); changeView('core') } },
     { label: 'View: Second Brain Globe', hint: 'lens', run: () => { changeMode('brain'); changeView('globe') } },
@@ -706,6 +710,7 @@ export default function App() {
           paused={mode !== 'brain'}
           focus={flyTo}
           settings={gset}
+          dueCount={due.length}
         />
       </div>
       <TopBar

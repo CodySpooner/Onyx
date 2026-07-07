@@ -5,35 +5,11 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { makeLabel } from '../lib/label.js'
-import { addLights, makeStarfield, makeNebula, softDot } from '../lib/scenery.js'
+import { addLights, makeStarfield, makeNebula, softDot, windowTexture } from '../lib/scenery.js'
 import { districtGrid } from '../lib/layouts.mjs'
 
 const GOLDEN = 2.399963
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1)
-
-// module-cached textures (like softDot)
-let WINDOWS = null
-function windowTexture() {
-  if (WINDOWS) return WINDOWS
-  const c = document.createElement('canvas')
-  c.width = 64
-  c.height = 256
-  const ctx = c.getContext('2d')
-  ctx.fillStyle = '#000'
-  ctx.fillRect(0, 0, 64, 256)
-  ctx.fillStyle = '#cfe0ff'
-  let seed = 12345
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
-  for (let y = 6; y < 250; y += 9) {
-    for (let x = 6; x < 58; x += 9) {
-      if (rnd() > 0.45) ctx.fillRect(x, y, 3, 3)
-    }
-  }
-  WINDOWS = new THREE.CanvasTexture(c)
-  WINDOWS.magFilter = THREE.NearestFilter
-  WINDOWS.wrapS = WINDOWS.wrapT = THREE.RepeatWrapping
-  return WINDOWS
-}
 
 let SHAFT = null
 function shaftTexture() {

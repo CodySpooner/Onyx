@@ -18,6 +18,30 @@ export function softDot() {
   return DOT
 }
 
+// lit-window emissive map shared by city/eco building materials
+let WINDOWS = null
+export function windowTexture() {
+  if (WINDOWS) return WINDOWS
+  const c = document.createElement('canvas')
+  c.width = 64
+  c.height = 256
+  const ctx = c.getContext('2d')
+  ctx.fillStyle = '#000'
+  ctx.fillRect(0, 0, 64, 256)
+  ctx.fillStyle = '#cfe0ff'
+  let seed = 12345
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
+  for (let y = 6; y < 250; y += 9) {
+    for (let x = 6; x < 58; x += 9) {
+      if (rnd() > 0.45) ctx.fillRect(x, y, 3, 3)
+    }
+  }
+  WINDOWS = new THREE.CanvasTexture(c)
+  WINDOWS.magFilter = THREE.NearestFilter
+  WINDOWS.wrapS = WINDOWS.wrapT = THREE.RepeatWrapping
+  return WINDOWS
+}
+
 // ── orbs: varied gem shapes, shaded, per-orb spin/pulse ──────────
 const hashInt = (str) => {
   let h = 2166136261
