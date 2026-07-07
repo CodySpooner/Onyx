@@ -47,7 +47,7 @@ export class CoreView {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.95, 0.55, 0.08)
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.5, 0.3)
     this.composer.addPass(this.bloom)
 
     this.group = new THREE.Group()
@@ -121,7 +121,7 @@ export class CoreView {
         this.group.add(orb.mesh)
         this.nodes.push({ ...orb, id: note.id, baseColor: new THREE.Color(folder?.color || '#8fa2d9'), baseSize: size, active: true })
 
-        const label = makeLabel(note.title, '#e6ecff', 0.05)
+        const label = makeLabel(note.title, '#e6ecff', 0.036)
         label.position.set(p.x, p.y + size + 1.6, p.z)
         this.group.add(label)
         this.labels.push({ sprite: label, id: note.id })
@@ -169,12 +169,15 @@ export class CoreView {
         l.sprite.visible = false
         continue
       }
-      l.sprite.visible = true
       l.sprite.getWorldPosition(tmp)
       const d = tmp.distanceTo(cam)
-      let o = 1 - (d - near) / (far - near)
-      o = Math.max(0.03, Math.min(0.95, o))
+      let o = Math.min(0.95, 1 - (d - near) / (far - near))
       if (this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
+      if (o < 0.06) {
+        l.sprite.visible = false
+        continue
+      }
+      l.sprite.visible = true
       l.sprite.material.opacity = o
     }
   }

@@ -32,13 +32,13 @@ export class BrainView {
     const h = container.clientHeight || 800
 
     this.scene = new THREE.Scene()
-    this.scene.fog = new THREE.FogExp2(0x07070d, 0.0018)
+    this.scene.fog = new THREE.FogExp2(0x07070d, 0.0011)
     this.scene.add(makeNebula('#1c1442', '#0a1a3c'))
     this.scene.add(makeStarfield())
     addLights(this.scene)
 
     this.camera = new THREE.PerspectiveCamera(50, w / h, 0.1, 3000)
-    this.camera.position.set(18, 18, 192)
+    this.camera.position.set(18, 24, 300)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(w, h)
@@ -47,11 +47,11 @@ export class BrainView {
 
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
-    this.controls.maxDistance = 500
+    this.controls.maxDistance = 700
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 1.0, 0.6, 0.08))
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.5, 0.3))
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -94,7 +94,7 @@ export class BrainView {
       this.nodes.push(rec)
       this.byId.set(note.id, rec)
 
-      const label = makeLabel(note.title, '#eef2ff', 0.045)
+      const label = makeLabel(note.title, '#eef2ff', 0.032)
       this.group.add(label)
       this.labels.push({ sprite: label, id: note.id, rec })
     })
@@ -270,12 +270,15 @@ export class BrainView {
         l.sprite.visible = false
         continue
       }
-      l.sprite.visible = true
       l.sprite.position.set(l.rec.mesh.position.x, l.rec.mesh.position.y + l.rec.baseSize + 1.3, l.rec.mesh.position.z)
       const d = tmp.copy(l.sprite.position).distanceTo(cam)
-      let o = 1 - (d - 100) / 110
-      o = Math.max(0.03, Math.min(0.95, o))
+      let o = Math.min(0.95, 1 - (d - 230) / 230)
       if (this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
+      if (o < 0.06) {
+        l.sprite.visible = false // culled, not ghosted — kills 100-label overdraw
+        continue
+      }
+      l.sprite.visible = true
       l.sprite.material.opacity = o
     }
 

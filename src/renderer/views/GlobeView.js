@@ -7,7 +7,7 @@ import { hashAngle } from '../lib/graph.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs } from '../lib/scenery.js'
 
-const R = 48
+const R = 62
 const GOLDEN = Math.PI * (3 - Math.sqrt(5))
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
@@ -32,7 +32,7 @@ export class GlobeView {
     addLights(this.scene)
 
     this.camera = new THREE.PerspectiveCamera(52, w / h, 0.1, 3000)
-    this.camera.position.set(0, 26, 158)
+    this.camera.position.set(0, 32, 205)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(w, h)
@@ -45,7 +45,7 @@ export class GlobeView {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 1.0, 0.62, 0.06)
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.5, 0.3)
     this.composer.addPass(this.bloom)
 
     this.group = new THREE.Group()
@@ -117,7 +117,7 @@ export class GlobeView {
       this.nodes.push({ ...orb, id: note.id, baseColor: new THREE.Color(folder?.color || '#c9a2ff'), baseSize: size, active: true })
       radial.push(0, 0, 0, p.x, p.y, p.z)
 
-      const label = makeLabel(note.title, '#eef2ff', 0.045)
+      const label = makeLabel(note.title, '#eef2ff', 0.032)
       label.position.set(p.x, p.y + size + 1.4, p.z)
       this.group.add(label)
       this.labels.push({ sprite: label, id: note.id })
@@ -181,12 +181,20 @@ export class GlobeView {
         l.sprite.visible = false
         continue
       }
-      l.sprite.visible = true
       l.sprite.getWorldPosition(tmp)
+      // far-hemisphere cull: labels behind the globe just add noise
+      if (tmp.dot(cam) / (tmp.length() * cam.length() || 1) < -0.15) {
+        l.sprite.visible = false
+        continue
+      }
       const d = tmp.distanceTo(cam)
-      let o = 1 - (d - near) / (far - near)
-      o = Math.max(0.03, Math.min(0.95, o))
+      let o = Math.min(0.95, 1 - (d - near) / (far - near))
       if (this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
+      if (o < 0.06) {
+        l.sprite.visible = false
+        continue
+      }
+      l.sprite.visible = true
       l.sprite.material.opacity = o
     }
   }
@@ -217,7 +225,7 @@ export class GlobeView {
     if (this.pulses) this.pulses.update(dt)
     const pulse = 1 + Math.sin(this._t * 1.8) * 0.06
     if (this.core) this.core.scale.setScalar(pulse)
-    this._fadeLabels(112, 210)
+    this._fadeLabels(140, 260)
     this.controls.update()
     this.composer.render()
   }

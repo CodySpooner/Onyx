@@ -4,6 +4,7 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { hashAngle } from '../lib/graph.mjs'
+import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, animateOrbs } from '../lib/scenery.js'
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -14,6 +15,8 @@ export class GraphView {
     this.container = container
     this.onSelect = onSelect
     this.nodes = []
+    this.labels = []
+    this.labelsVisible = true
     this.activeIds = null
     this._t = 0
 
@@ -26,7 +29,7 @@ export class GraphView {
     addLights(this.scene)
 
     this.camera = new THREE.PerspectiveCamera(60, w / h, 0.1, 2000)
-    this.camera.position.set(0, 0, 92)
+    this.camera.position.set(0, 0, 150)
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(w, h)
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
@@ -36,7 +39,7 @@ export class GraphView {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.95, 0.6, 0.1))
+    this.composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.5, 0.3))
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -60,11 +63,11 @@ export class GraphView {
     graph.notes.forEach((n) => {
       const fi = folderIndex.get(n.folder) || 0
       const ca = (fi / Math.max(1, graph.folders.length)) * Math.PI * 2
-      const cx = Math.cos(ca) * 34
-      const cz = Math.sin(ca) * 34
+      const cx = Math.cos(ca) * 64
+      const cz = Math.sin(ca) * 64
       const a = hashAngle(n.id)
-      const r = 4 + hashAngle('r' + n.id) * 1.6
-      const p = new THREE.Vector3(cx + Math.cos(a) * r, (hashAngle('y' + n.id) - Math.PI) * 3, cz + Math.sin(a) * r)
+      const r = 9 + hashAngle('r' + n.id) * 2.8
+      const p = new THREE.Vector3(cx + Math.cos(a) * r, (hashAngle('y' + n.id) - Math.PI) * 7, cz + Math.sin(a) * r)
       pos.set(n.id, p)
       const links = n.outLinks.length + n.inLinks.length
       const size = clamp(0.6 + links * 0.09, 0.6, 2.2)
@@ -72,6 +75,20 @@ export class GraphView {
       orb.mesh.position.copy(p)
       this.group.add(orb.mesh)
       this.nodes.push({ ...orb, id: n.id, baseSize: size, active: true })
+
+      const label = makeLabel(n.title, '#eef2ff', 0.032)
+      label.position.set(p.x, p.y + size + 1.4, p.z)
+      this.group.add(label)
+      this.labels.push({ sprite: label, id: n.id })
+    })
+
+    // folder place-names at each constellation's center
+    graph.folders.forEach((f, fi) => {
+      const ca = (fi / Math.max(1, graph.folders.length)) * Math.PI * 2
+      const label = makeLabel(f.name, f.color, 0.07)
+      label.position.set(Math.cos(ca) * 64, 26, Math.sin(ca) * 64)
+      this.group.add(label)
+      this.labels.push({ sprite: label, id: null, fixed: true })
     })
     const pts = []
     for (const l of graph.links) {
@@ -101,6 +118,31 @@ export class GraphView {
 
   setLinksMode() {}
 
+  setLabels(show) {
+    this.labelsVisible = show !== false
+  }
+
+  _fadeLabels() {
+    const cam = this.camera.position
+    const tmp = new THREE.Vector3()
+    for (const l of this.labels) {
+      if (!this.labelsVisible) {
+        l.sprite.visible = false
+        continue
+      }
+      l.sprite.getWorldPosition(tmp)
+      const d = tmp.distanceTo(cam)
+      let o = l.fixed ? 0.95 : Math.min(0.95, 1 - (d - 130) / 150)
+      if (l.id && this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
+      if (o < 0.06) {
+        l.sprite.visible = false
+        continue
+      }
+      l.sprite.visible = true
+      l.sprite.material.opacity = o
+    }
+  }
+
   _click(e) {
     const r = this.renderer.domElement.getBoundingClientRect()
     this.pointer.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
@@ -116,6 +158,7 @@ export class GraphView {
       if (!child.userData?.sharedGeo) child.geometry?.dispose()
     }
     this.nodes = []
+    this.labels = []
     this.lines = null
   }
 
@@ -134,6 +177,7 @@ export class GraphView {
     this._t += dt
     this.group.rotation.y += 0.0006
     animateOrbs(this.nodes, this._t, dt)
+    this._fadeLabels()
     this.controls.update()
     this.composer.render()
   }

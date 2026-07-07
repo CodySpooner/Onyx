@@ -5,21 +5,21 @@ import { hashAngle } from './graph.mjs'
 // behind this same createSim API.
 export function createSim(ids, links, opts = {}) {
   const o = {
-    repulsion: 260,
+    repulsion: 900,
     forceCap: 2.5,
-    cutoff2: 3600, // stop repelling beyond 60 units
+    cutoff2: 13000, // stop repelling beyond ~114 units
     spring: 0.015,
-    restLen: 14,
-    center: 0.0035,
+    restLen: 27,
+    center: 0.0016,
     yFlatten: 1.6, // stronger vertical centering → gently oblate brain
     damping: 0.85,
-    maxRadius: 90,
+    maxRadius: 165,
     ...opts
   }
   const nodes = ids.map((id) => {
     const a = hashAngle(id)
     const b = hashAngle('y' + id)
-    const r = 18 + (hashAngle('r' + id) / (Math.PI * 2)) * 14
+    const r = 34 + (hashAngle('r' + id) / (Math.PI * 2)) * 26
     return { id, x: Math.cos(a) * r, y: (b - Math.PI) * 5, z: Math.sin(a) * r, vx: 0, vy: 0, vz: 0 }
   })
   const byId = new Map(nodes.map((n) => [n.id, n]))

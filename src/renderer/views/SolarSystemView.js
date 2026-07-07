@@ -4,17 +4,21 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { hashAngle } from '../lib/graph.mjs'
+import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula } from '../lib/scenery.js'
 
-const FOLDER_RING = 74
+const FOLDER_RING = 120
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 export class SolarSystemView {
-  constructor(container, { onSelect }) {
+  constructor(container, { onSelect, onHover }) {
     this.container = container
     this.onSelect = onSelect
+    this.onHover = onHover || (() => {})
     this.planets = []
     this.suns = new Map()
+    this.labels = []
+    this.labelsVisible = true
     this.activeIds = null
     this.hovered = null
     this.showAllLinks = true
@@ -30,7 +34,7 @@ export class SolarSystemView {
     addLights(this.scene)
 
     this.camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 3000)
-    this.camera.position.set(0, 82, 168)
+    this.camera.position.set(0, 110, 230)
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true })
     this.renderer.setSize(w, h)
@@ -43,7 +47,7 @@ export class SolarSystemView {
 
     this.composer = new EffectComposer(this.renderer)
     this.composer.addPass(new RenderPass(this.scene, this.camera))
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.9, 0.5, 0.12)
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.65, 0.5, 0.3)
     this.composer.addPass(this.bloom)
 
     this.linkGroup = new THREE.Group()
@@ -83,6 +87,11 @@ export class SolarSystemView {
       halo.position.copy(pos)
       this.scene.add(halo)
       this.suns.set(f.id, { mesh, halo, pos, color })
+
+      const sunLabel = makeLabel(f.name, f.color, 0.07)
+      sunLabel.position.set(pos.x, pos.y + 8.5, pos.z)
+      this.scene.add(sunLabel)
+      this.labels.push({ sprite: sunLabel, id: null, fixed: true })
     })
 
     const perFolder = new Map()
@@ -91,22 +100,29 @@ export class SolarSystemView {
       if (!sun) return
       const k = perFolder.get(note.folder) || 0
       perFolder.set(note.folder, k + 1)
-      const orbitR = 4 + (k % 4) * 1.7 + k / 20
+      // concentric rings of 5: pitch 3.4 > max planet diameter → no intersections
+      const ring = Math.floor(k / 5)
+      const orbitR = 6 + ring * 3.4 + (k % 5) * 0.3
       const links = note.outLinks.length + note.inLinks.length
       const size = clamp(0.5 + links * 0.12, 0.5, 2.3)
       const orb = makeOrb(sun.color, size, note.type, note.id)
       this.scene.add(orb.mesh)
-      this.planets.push({
+      const rec = {
         ...orb,
         note,
         sun,
         orbitR,
-        speed: 0.15 + (k % 5) * 0.03,
+        speed: Math.max(0.06, 0.22 - ring * 0.03),
         phase: hashAngle(note.id),
         baseColor: sun.color.clone(),
         baseSize: size,
         active: true
-      })
+      }
+      this.planets.push(rec)
+
+      const label = makeLabel(note.title, '#eef2ff', 0.032)
+      this.scene.add(label)
+      this.labels.push({ sprite: label, id: note.id, rec })
     })
 
     this._buildLinks()
@@ -128,9 +144,37 @@ export class SolarSystemView {
     this.linkGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(coords), 3))
     this.lines = new THREE.LineSegments(
       this.linkGeo,
-      new THREE.LineBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.14, blending: THREE.AdditiveBlending, depthWrite: false })
+      new THREE.LineBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false })
     )
+    this.lines.visible = this.showAllLinks
     this.linkGroup.add(this.lines)
+
+    // incident-only hover highlight (BrainView pattern)
+    this.hlGeo = new THREE.BufferGeometry()
+    this.hlGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3))
+    this.hlLines = new THREE.LineSegments(
+      this.hlGeo,
+      new THREE.LineBasicMaterial({ color: 0xd8ecff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false })
+    )
+    this.linkGroup.add(this.hlLines)
+  }
+
+  _rebuildHighlight() {
+    if (!this.hlGeo) return
+    const id = this.hovered
+    const segs = []
+    if (id) {
+      for (const [a, b] of this.linkPairs) {
+        if (a.note.id === id || b.note.id === id) {
+          segs.push(
+            a.mesh.position.x, a.mesh.position.y, a.mesh.position.z,
+            b.mesh.position.x, b.mesh.position.y, b.mesh.position.z
+          )
+        }
+      }
+    }
+    this.hlGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(segs), 3))
+    this.hlGeo.attributes.position.needsUpdate = true
   }
 
   setActive(idSet) {
@@ -146,7 +190,11 @@ export class SolarSystemView {
 
   setLinksMode(showAll) {
     this.showAllLinks = showAll !== false
-    if (this.lines) this.lines.visible = true
+    if (this.lines) this.lines.visible = this.showAllLinks
+  }
+
+  setLabels(show) {
+    this.labelsVisible = show !== false
   }
 
   _positions() {
@@ -190,7 +238,12 @@ export class SolarSystemView {
   _hover(e) {
     const hit = this._pick(e, this.planets.map((p) => p.mesh))
     this.renderer.domElement.style.cursor = hit ? 'pointer' : 'default'
-    this.hovered = hit ? hit.object.userData.id : null
+    const id = hit ? hit.object.userData.id : null
+    if (id !== this.hovered) {
+      this.hovered = id
+      this._rebuildHighlight()
+      if (!id) this.onHover(null)
+    }
   }
 
   _click(e) {
@@ -226,15 +279,49 @@ export class SolarSystemView {
     }
     const pulse = 1 + Math.sin(this._t * 2) * 0.04
     for (const [, s] of this.suns) s.mesh.scale.setScalar(pulse)
-    if (this.lines) {
-      const base = this.showAllLinks ? 0.14 : 0.0
-      this.lines.material.opacity = this.hovered ? Math.max(base, 0.3) : base
+    if (this.hovered) this._rebuildHighlight() // orbits move every frame
+
+    // labels: suns fixed, planet labels follow their orbits; distance fade
+    const cam = this.camera.position
+    const tmp = new THREE.Vector3()
+    for (const l of this.labels) {
+      if (!this.labelsVisible) {
+        l.sprite.visible = false
+        continue
+      }
+      if (l.rec) l.sprite.position.set(l.rec.mesh.position.x, l.rec.mesh.position.y + l.rec.baseSize + 1.4, l.rec.mesh.position.z)
+      const d = tmp.copy(l.sprite.position).distanceTo(cam)
+      let o = l.fixed ? 0.95 : Math.min(0.95, 1 - (d - 160) / 160)
+      if (l.id && this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
+      if (o < 0.06) {
+        l.sprite.visible = false
+        continue
+      }
+      l.sprite.visible = true
+      l.sprite.material.opacity = o
     }
+
+    // hover card stream (projected coords, like BrainView)
+    if (this.hovered) {
+      const rec = this.planets.find((p) => p.note.id === this.hovered)
+      if (rec) {
+        const w = this.container.clientWidth || 1400
+        const h = this.container.clientHeight || 800
+        tmp.copy(rec.mesh.position).project(this.camera)
+        this.onHover({ id: this.hovered, x: (tmp.x * 0.5 + 0.5) * w, y: (-tmp.y * 0.5 + 0.5) * h, pinned: false })
+      }
+    }
+
     this.controls.update()
     this.composer.render()
   }
 
   _clearScene() {
+    for (const l of this.labels) {
+      this.scene.remove(l.sprite)
+      l.sprite.material.dispose() // texture is cached in label.js, keep it
+    }
+    this.labels = []
     for (const p of this.planets) {
       this.scene.remove(p.mesh)
       if (!p.mesh.userData?.sharedGeo) p.mesh.geometry.dispose()
@@ -257,6 +344,14 @@ export class SolarSystemView {
       this.lines = null
       this.linkGeo = null
     }
+    if (this.hlLines) {
+      this.linkGroup.remove(this.hlLines)
+      this.hlLines.geometry.dispose()
+      this.hlLines.material.dispose()
+      this.hlLines = null
+      this.hlGeo = null
+    }
+    this.hovered = null
   }
 
   _resize() {
