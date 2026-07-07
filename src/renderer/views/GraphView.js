@@ -82,11 +82,12 @@ export class GraphView {
       this.labels.push({ sprite: label, id: n.id })
     })
 
-    // folder place-names at each constellation's center
+    // folder place-names at each constellation's center — staggered heights
+    // so 13 names on a 64u ring can't collide
     graph.folders.forEach((f, fi) => {
       const ca = (fi / Math.max(1, graph.folders.length)) * Math.PI * 2
-      const label = makeLabel(f.name, f.color, 0.07)
-      label.position.set(Math.cos(ca) * 64, 26, Math.sin(ca) * 64)
+      const label = makeLabel(f.name, f.color, 0.042)
+      label.position.set(Math.cos(ca) * 64, 26 + (fi % 2) * 11, Math.sin(ca) * 64)
       this.group.add(label)
       this.labels.push({ sprite: label, id: null, fixed: true })
     })
