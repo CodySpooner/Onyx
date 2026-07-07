@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { makeEnv, makeComposer } from '../lib/cinema.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { makeLabel } from '../lib/label.js'
-import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs } from '../lib/scenery.js'
+import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs, makeGlowShafts } from '../lib/scenery.js'
 
 const TOP = 60
 const HEIGHT = 108
@@ -77,6 +77,9 @@ export class CoreView {
     this.core = new THREE.Mesh(new THREE.SphereGeometry(3.6, 32, 32), new THREE.MeshBasicMaterial({ color: 0xffffff }))
     this.core.position.set(0, TOP, 0)
     this.group.add(this.core)
+    this.shafts = makeGlowShafts('#9fc4ff', 44, 3, 0.11)
+    this.shafts.position.set(0, TOP - 22, 0)
+    this.group.add(this.shafts)
     for (const [r, c, o] of [[6.5, 0x9fc4ff, 0.2], [11, 0x6a7cff, 0.09]]) {
       const halo = new THREE.Mesh(
         new THREE.SphereGeometry(r, 24, 24),
@@ -208,6 +211,7 @@ export class CoreView {
     this.group.rotation.y += 0.0012
     animateOrbs(this.nodes, this._t, dt)
     if (this.pulses) this.pulses.update(dt)
+    if (this.shafts) this.shafts.rotation.y += dt * 0.13
     const pulse = 1 + Math.sin(this._t * 1.6) * 0.05
     if (this.core) this.core.scale.setScalar(pulse)
     this._fadeLabels(150, 236)
@@ -230,6 +234,7 @@ export class CoreView {
     this.labels = []
     this.core = null
     this.fan = null
+    this.shafts = null
   }
 
   _resize() {

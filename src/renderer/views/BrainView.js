@@ -8,7 +8,8 @@ import { hashAngle } from '../lib/graph.mjs'
 import { createSim } from '../lib/force.mjs'
 import { detectClusters, CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { makeLabel } from '../lib/label.js'
-import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses } from '../lib/scenery.js'
+import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, softDot } from '../lib/scenery.js'
+import { easeInOutCubic, easeOutBack, clamp01 } from '../lib/cinemath.mjs'
 
 const ORPHAN_COLOR = '#4a5470'
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -93,7 +94,7 @@ export class BrainView {
       const orb = makeOrb(colorHex, size, note.type, note.id)
       orb.mesh.position.set(simNode.x, simNode.y, simNode.z)
       this.group.add(orb.mesh)
-      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci }
+      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci, bornAt: this._t + this.nodes.length * 0.015 }
       this.nodes.push(rec)
       this.byId.set(note.id, rec)
 
@@ -246,7 +247,10 @@ export class BrainView {
       n.mesh.rotation.x += n.spinX
       n.mesh.rotation.y += n.spinY
       const pulse = 1 + Math.sin(this._t * 1.5 + n.pulse) * 0.07
-      n.mesh.scale.setScalar(n.baseSize * pulse * (n.active ? 1 : 0.55))
+      // staggered cascade-pop on (re)build — easeOutBack overshoot sells it
+      n.spawnK = clamp01((this._t - (n.bornAt ?? 0)) / 0.6)
+      const spawn = easeOutBack(n.spawnK)
+      n.mesh.scale.setScalar(Math.max(0.001, n.baseSize * pulse * (n.active ? 1 : 0.55) * spawn))
     }
 
     // live link buffer (lines + pulses share it)
@@ -276,6 +280,7 @@ export class BrainView {
       l.sprite.position.set(l.rec.mesh.position.x, l.rec.mesh.position.y + l.rec.baseSize + 1.3, l.rec.mesh.position.z)
       const d = tmp.copy(l.sprite.position).distanceTo(cam)
       let o = Math.min(0.95, 1 - (d - 230) / 230)
+      if (l.rec.spawnK != null) o *= l.rec.spawnK // labels fade in with their orbs
       if (this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
       if (o < 0.06) {
         l.sprite.visible = false // culled, not ghosted — kills 100-label overdraw
@@ -287,10 +292,31 @@ export class BrainView {
 
     if (this._flight) {
       this._flight.t = Math.min(1, this._flight.t + 0.02)
-      const k = this._flight.t * (2 - this._flight.t)
+      const k = easeInOutCubic(this._flight.t)
       this.camera.position.lerpVectors(this._flight.from, this._flight.to, k)
       this.controls.target.lerp(this._flight.look, k)
-      if (this._flight.t >= 1) this._flight = null
+      if (this._flight.t >= 1) {
+        // arrival ring flash at the destination
+        const ring = new THREE.Sprite(
+          new THREE.SpriteMaterial({ map: softDot(), color: 0xbfe0ff, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending })
+        )
+        ring.position.copy(this._flight.look)
+        ring.scale.setScalar(2)
+        this.group.add(ring)
+        this._ringFx = { sprite: ring, t: 0 }
+        this._flight = null
+      }
+    }
+    if (this._ringFx) {
+      this._ringFx.t += dt * 2
+      const rk = Math.min(1, this._ringFx.t)
+      this._ringFx.sprite.scale.setScalar(2 + rk * 9)
+      this._ringFx.sprite.material.opacity = 0.7 * (1 - rk)
+      if (rk >= 1) {
+        this.group.remove(this._ringFx.sprite)
+        this._ringFx.sprite.material.dispose()
+        this._ringFx = null
+      }
     }
 
     // hover card position stream

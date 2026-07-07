@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { makeEnv, makeComposer } from '../lib/cinema.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { makeLabel } from '../lib/label.js'
+import { makeGlowShafts } from '../lib/scenery.js'
 import { makeOrb, addLights, makeStarfield, makeNebula } from '../lib/scenery.js'
 
 const FOLDER_RING = 120
@@ -18,6 +19,8 @@ export class SolarSystemView {
     this.onHover = onHover || (() => {})
     this.planets = []
     this.suns = new Map()
+    this.shaftGroups = []
+    this.shaftGroups = []
     this.labels = []
     this.labelsVisible = true
     this.activeIds = null
@@ -88,7 +91,12 @@ export class SolarSystemView {
       )
       halo.position.copy(pos)
       this.scene.add(halo)
-      this.suns.set(f.id, { mesh, halo, pos, color })
+      const shafts = makeGlowShafts(f.color, 30, 2.5, 0.1)
+      shafts.position.set(pos.x, pos.y - 15, pos.z)
+      shafts.userData.spin = i % 2 === 0 ? 0.14 : -0.11
+      this.scene.add(shafts)
+      this.shaftGroups.push(shafts)
+      this.suns.set(f.id, { mesh, halo, shafts, pos, color })
 
       const sunLabel = makeLabel(f.name, f.color, 0.07)
       sunLabel.position.set(pos.x, pos.y + 8.5, pos.z)
@@ -269,7 +277,8 @@ export class SolarSystemView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    this._t += Math.min(0.05, this.clock.getDelta())
+    const dt = Math.min(0.05, this.clock.getDelta())
+    this._t += dt
     this._positions()
     this._updateLinks()
     if (this._flight) {
@@ -279,6 +288,7 @@ export class SolarSystemView {
       this.controls.target.lerp(this._flight.look, k)
       if (this._flight.t >= 1) this._flight = null
     }
+    for (const g of this.shaftGroups) g.rotation.y += dt * g.userData.spin
     const pulse = 1 + Math.sin(this._t * 2) * 0.04
     for (const [, s] of this.suns) s.mesh.scale.setScalar(pulse)
     if (this.hovered) this._rebuildHighlight() // orbits move every frame
@@ -333,6 +343,11 @@ export class SolarSystemView {
     for (const [, s] of this.suns) {
       this.scene.remove(s.mesh)
       this.scene.remove(s.halo)
+      if (s.shafts) {
+        this.scene.remove(s.shafts)
+        s.shafts.children[0]?.material.dispose()
+        for (const c of s.shafts.children) c.geometry.dispose()
+      }
       s.mesh.geometry.dispose()
       s.mesh.material.dispose()
       s.halo.geometry.dispose()

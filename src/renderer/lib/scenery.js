@@ -91,13 +91,20 @@ export function addLights(scene) {
   return [amb, key, rim]
 }
 
-// ── layered starfield with soft round twinkling stars ────────────
-export function makeStarfield(count = 1400) {
+// ── layered starfield: far dome + near parallax layer ───────────
+export function makeStarfield(count = 1400, layers = 2) {
+  const g = new THREE.Group()
+  g.add(starLayer(count, 380, 460, 2.2))
+  if (layers > 1) g.add(starLayer(Math.floor(count / 4), 180, 140, 3.0)) // near — slides against the dome
+  return g
+}
+
+function starLayer(count, rBase, rSpread, size) {
   const geo = new THREE.BufferGeometry()
   const pos = new Float32Array(count * 3)
   const col = new Float32Array(count * 3)
   for (let i = 0; i < count; i++) {
-    const r = 380 + (i % 460)
+    const r = rBase + (i % rSpread)
     const a = (hashInt('sx' + i) / 4294967295) * Math.PI * 2
     const b = (hashInt('sy' + i) / 4294967295 - 0.5) * 2
     pos[i * 3] = Math.cos(a) * r
@@ -112,7 +119,7 @@ export function makeStarfield(count = 1400) {
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
   const mat = new THREE.PointsMaterial({
-    size: 2.2,
+    size,
     map: softDot(),
     vertexColors: true,
     transparent: true,
@@ -156,10 +163,51 @@ export function makeNebula(hexA = '#2a1a4d', hexB = '#0a1836') {
   return mesh
 }
 
+// ── crossed glow shafts: cheap volumetric light for suns/cores ───
+let SHAFT_TEX = null
+function shaftTex() {
+  if (SHAFT_TEX) return SHAFT_TEX
+  const c = document.createElement('canvas')
+  c.width = 32
+  c.height = 128
+  const ctx = c.getContext('2d')
+  const g = ctx.createLinearGradient(0, 128, 0, 0)
+  g.addColorStop(0, 'rgba(255,255,255,0.75)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 32, 128)
+  SHAFT_TEX = new THREE.CanvasTexture(c)
+  return SHAFT_TEX
+}
+
+// returns a Group; caller positions it and rotates .rotation.y in its loop
+export function makeGlowShafts(colorHex, height = 34, width = 3, opacity = 0.12) {
+  const group = new THREE.Group()
+  const mat = new THREE.MeshBasicMaterial({
+    map: shaftTex(),
+    color: new THREE.Color(colorHex),
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide
+  })
+  for (const r of [0, Math.PI / 2]) {
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat)
+    plane.rotation.y = r
+    plane.position.y = height / 2
+    group.add(plane)
+  }
+  return group
+}
+
 // ── energy pulses traveling along link segments ─────────────────
 export class LinkPulses {
   // segments: Float32Array-like flat list [ax,ay,az,bx,by,bz, ...]
+  // Each mote renders as a comet: TRAIL points chained behind the head with
+  // color decaying to black (invisible under additive blending).
   constructor(group, segments, colorHex, count = 70) {
+    this.TRAIL = 6
     this.segs = segments
     this.nSeg = segments.length / 6
     this.count = this.nSeg > 0 ? Math.min(count, this.nSeg) : 0
@@ -167,14 +215,27 @@ export class LinkPulses {
     for (let i = 0; i < this.count; i++) {
       this.assign.push({ seg: Math.floor((i / this.count) * this.nSeg), t: (i / this.count) % 1, speed: 0.35 + (i % 6) * 0.08 })
     }
-    const pos = new Float32Array(Math.max(1, this.count) * 3)
+    const n = Math.max(1, this.count) * this.TRAIL
+    const pos = new Float32Array(n * 3)
+    const col = new Float32Array(n * 3)
+    const base = new THREE.Color(colorHex)
+    for (let i = 0; i < this.count; i++) {
+      for (let k = 0; k < this.TRAIL; k++) {
+        const f = 1 - (k / this.TRAIL) * 0.88
+        const o = (i * this.TRAIL + k) * 3
+        col[o] = base.r * f
+        col[o + 1] = base.g * f
+        col[o + 2] = base.b * f
+      }
+    }
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
     this.geo = geo
     this.points = new THREE.Points(
       geo,
       new THREE.PointsMaterial({
-        color: new THREE.Color(colorHex),
+        vertexColors: true,
         size: 3.2,
         map: softDot(),
         transparent: true,
@@ -190,6 +251,7 @@ export class LinkPulses {
   update(dt) {
     if (this.count === 0) return
     const arr = this.geo.attributes.position.array
+    const s = this.segs
     for (let i = 0; i < this.count; i++) {
       const a = this.assign[i]
       a.t += a.speed * dt
@@ -198,10 +260,13 @@ export class LinkPulses {
         a.seg = (a.seg + 13) % this.nSeg
       }
       const o = a.seg * 6
-      const s = this.segs
-      arr[i * 3] = s[o] + (s[o + 3] - s[o]) * a.t
-      arr[i * 3 + 1] = s[o + 1] + (s[o + 4] - s[o + 1]) * a.t
-      arr[i * 3 + 2] = s[o + 2] + (s[o + 5] - s[o + 2]) * a.t
+      for (let k = 0; k < this.TRAIL; k++) {
+        const tk = Math.max(0, a.t - k * 0.028)
+        const p = (i * this.TRAIL + k) * 3
+        arr[p] = s[o] + (s[o + 3] - s[o]) * tk
+        arr[p + 1] = s[o + 1] + (s[o + 4] - s[o + 1]) * tk
+        arr[p + 2] = s[o + 2] + (s[o + 5] - s[o + 2]) * tk
+      }
     }
     this.geo.attributes.position.needsUpdate = true
   }
