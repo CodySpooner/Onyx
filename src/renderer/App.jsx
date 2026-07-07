@@ -8,6 +8,7 @@ import { HudSidebar } from './components/HudSidebar.jsx'
 import { FolderTabs } from './components/FolderTabs.jsx'
 import { HudToolbar } from './components/HudToolbar.jsx'
 import { UpdateToast } from './components/UpdateToast.jsx'
+import { HoverCard } from './components/HoverCard.jsx'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -19,6 +20,7 @@ export default function App() {
   const [showAllLinks, setShowAllLinks] = useState(true)
   const [showLabels, setShowLabels] = useState(false)
   const [resetNonce, setResetNonce] = useState(0)
+  const [hover, setHover] = useState(null)
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
@@ -34,7 +36,14 @@ export default function App() {
 
   // ponytail: verification hook so automated screenshots can drive the UI
   useEffect(() => {
-    window.__onyxDebug = { select: setSelected, setFilter, setView, setShowAllLinks, setShowLabels }
+    window.__onyxDebug = {
+      select: setSelected,
+      setFilter,
+      setView,
+      setShowAllLinks,
+      setShowLabels,
+      hover: (id) => setHover({ id, x: 620, y: 320, pinned: true })
+    }
   }, [])
 
   if (!graph) {
@@ -88,6 +97,7 @@ export default function App() {
           graph={graph}
           activeIds={filtering ? activeIds : null}
           onSelect={setSelected}
+          onHover={setHover}
           showAllLinks={showAllLinks}
           showLabels={showLabels}
           resetNonce={resetNonce}
@@ -122,6 +132,7 @@ export default function App() {
           onReset={() => setResetNonce((n) => n + 1)}
         />
       </div>
+      <HoverCard hover={hover} graph={graph} />
       {selected && (
         <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
       )}
