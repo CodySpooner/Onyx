@@ -32,7 +32,7 @@ const ICONS = {
 
 function TBtn({ icon, on, onClick, title }) {
   return (
-    <button className={`tbtn ${on ? 'on' : ''}`} onClick={onClick} title={title}>
+    <button className={`tbtn tip-left ${on ? 'on' : ''}`} onClick={onClick} data-tip={title}>
       <svg viewBox="0 0 24 24" width="20" height="20">
         {ICONS[icon]}
       </svg>

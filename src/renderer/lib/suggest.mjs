@@ -127,6 +127,27 @@ export function buildSuggestions(notes, opts = {}) {
   return kept
 }
 
+// Orphan triage: every zero-degree note, paired with its best suggestion
+// candidates. Orphans with no candidates sort last (skip-only rows).
+export function triageQueue(notes, suggestions, dismissed = new Set()) {
+  const key = (s) => (s.a < s.b ? s.a + '|' + s.b : s.b + '|' + s.a)
+  const rows = notes
+    .filter((n) => (n.outLinks?.length || 0) + (n.inLinks?.length || 0) === 0)
+    .map((o) => ({
+      orphan: o.id,
+      candidates: suggestions
+        .filter((s) => (s.a === o.id || s.b === o.id) && !dismissed.has(key(s)))
+        .sort((x, y) => y.score - x.score)
+        .slice(0, 3)
+    }))
+  rows.sort(
+    (a, b) =>
+      (b.candidates.length ? 1 : 0) - (a.candidates.length ? 1 : 0) ||
+      (a.orphan < b.orphan ? -1 : 1)
+  )
+  return rows
+}
+
 // The one vault write: wrap the first unlinked whole-word mention, or file
 // the link under ## Related. Returns raw unchanged if [[target]] already there.
 // `target` is the note's FILENAME basename — the only thing wikilinks resolve

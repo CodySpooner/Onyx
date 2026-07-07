@@ -36,3 +36,39 @@ test('openTasks filters done and sorts by source mtime desc', () => {
   assert.deepEqual(open.map((t) => t.text), ['new open', 'old open'])
   assert.equal(open[0].title, 'New')
 })
+
+// ── toggleTask (content-guarded write-back) ─────────────────────
+import { toggleTask } from '../src/renderer/lib/tasks.mjs'
+
+test('toggleTask: flips at expected line, both directions, reports nowDone', () => {
+  const raw = '# t\n- [ ] call bookie\n- [x] set lines\n'
+  const on = toggleTask(raw, 1, '- [ ] call bookie')
+  assert.equal(on.next, '# t\n- [x] call bookie\n- [x] set lines\n')
+  assert.equal(on.nowDone, true)
+  const off = toggleTask(raw, 2, '- [x] set lines')
+  assert.equal(off.next, '# t\n- [ ] call bookie\n- [ ] set lines\n')
+  assert.equal(off.nowDone, false)
+})
+
+test('toggleTask: relocates by exact match when lines shifted', () => {
+  const raw = 'new intro line\n# t\n- [ ] call bookie\n'
+  const r = toggleTask(raw, 1, '- [ ] call bookie') // stale index
+  assert.ok(r.next.includes('- [x] call bookie'))
+})
+
+test('toggleTask: refuses on missing or duplicate expected lines', () => {
+  assert.equal(toggleTask('- [ ] other\n', 0, '- [ ] gone'), null)
+  assert.equal(toggleTask('- [ ] dup\n- [ ] dup\n', 5, '- [ ] dup'), null)
+})
+
+test('toggleTask: CRLF preserved; indented and starred bullets work', () => {
+  const raw = 'a\r\n  * [ ] nested\r\n'
+  const r = toggleTask(raw, 1, '  * [ ] nested')
+  assert.equal(r.next, 'a\r\n  * [x] nested\r\n')
+})
+
+test('toggleTask: text containing brackets only flips the checkbox', () => {
+  const raw = '- [x] fix [ ] placeholder later\n'
+  const r = toggleTask(raw, 0, '- [x] fix [ ] placeholder later')
+  assert.equal(r.next, '- [ ] fix [ ] placeholder later\n')
+})

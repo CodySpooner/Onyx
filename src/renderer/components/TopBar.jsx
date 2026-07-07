@@ -12,10 +12,11 @@ export function TopBar({ mode, onMode, view, onView, onSearch, skillTab }) {
     <header className="topbar">
       <span className="brand">◑ ONYX</span>
       <nav className="mtabs">
-        {MODES.map((m) => (
+        {MODES.map((m, i) => (
           <button
             key={m.id}
-            className={`mtab ${mode === m.id ? 'on' : ''}`}
+            className={`mtab tip-below ${mode === m.id ? 'on' : ''}`}
+            data-tip={`Ctrl+${i + 1}`}
             onClick={() => onMode(m.id)}
           >
             {m.id === 'skills' && skillTab ? (

@@ -322,16 +322,16 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
           </div>
         </div>
         <div className="reader-actions">
-          <button onClick={onTogglePin} className={pinned ? 'pin on' : 'pin'} title={pinned ? 'Unpin' : 'Pin'}>
+          <button onClick={onTogglePin} className={pinned ? 'pin on' : 'pin'} data-tip={pinned ? 'Unpin' : 'Pin'}>
             {pinned ? '◉' : '⊙'}
           </button>
           {!editing && raw != null && (
-            <button onClick={startEdit} title="Edit note">✎</button>
+            <button onClick={startEdit} data-tip="Edit note">✎</button>
           )}
           {!editing && (
-            <button onClick={del} className="danger" title="Delete note">🗑</button>
+            <button onClick={del} className="danger" data-tip="Delete note">⌫</button>
           )}
-          <button onClick={onClose} title="Close">✕</button>
+          <button onClick={onClose} data-tip="Close · Esc">✕</button>
         </div>
       </div>
       {editing ? (

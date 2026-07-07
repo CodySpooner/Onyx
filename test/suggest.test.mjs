@@ -110,3 +110,37 @@ test('undo round-trip: keeping the original raw restores exactly', () => {
   // undo is writeNote(id, raw) — trivially byte-exact by construction
   assert.equal(raw, 'a note that mentions Risk Rules today\n')
 })
+
+// ── triageQueue (orphan inbox) ──────────────────────────────────
+import { triageQueue } from '../src/renderer/lib/suggest.mjs'
+
+test('triageQueue: only degree-0 notes; candidates capped at 3, sorted, dismissed excluded', () => {
+  const notes = [
+    { id: 'o1', outLinks: [], inLinks: [] },
+    { id: 'o2', outLinks: [], inLinks: [] },
+    { id: 'linked', outLinks: ['x'], inLinks: [] }
+  ]
+  const sugg = [
+    { a: 'o1', b: 'p1', score: 5 },
+    { a: 'o1', b: 'p2', score: 9 },
+    { a: 'p3', b: 'o1', score: 7 },
+    { a: 'o1', b: 'p4', score: 6 },
+    { a: 'o1', b: 'p5', score: 2 },
+    { a: 'linked', b: 'p1', score: 8 }
+  ]
+  const q = triageQueue(notes, sugg, new Set(['o1|p4']))
+  assert.deepEqual(q.map((r) => r.orphan), ['o1', 'o2'])
+  assert.deepEqual(q[0].candidates.map((c) => c.score), [9, 7, 5]) // p4 dismissed, p5 cut by cap? no — cap 3 after sort
+  assert.equal(q[1].candidates.length, 0) // o2 has none → last
+})
+
+test('triageQueue: deterministic ordering, no-candidate orphans last', () => {
+  const notes = [
+    { id: 'zz', outLinks: [], inLinks: [] },
+    { id: 'aa', outLinks: [], inLinks: [] },
+    { id: 'mm', outLinks: [], inLinks: [] }
+  ]
+  const sugg = [{ a: 'mm', b: 'x', score: 5 }]
+  const q = triageQueue(notes, sugg)
+  assert.deepEqual(q.map((r) => r.orphan), ['mm', 'aa', 'zz'])
+})

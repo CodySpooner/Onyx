@@ -55,7 +55,7 @@ function BarRow({ color, label, value, max, onClick }) {
   )
 }
 
-export function DashboardMode({ graph, clusters, usage, onSelect, onFilter, suggestions = [], onAcceptSuggestion, onDismissSuggestion }) {
+export function DashboardMode({ graph, clusters, usage, onSelect, onFilter, suggestions = [], onAcceptSuggestion, onDismissSuggestion, onTriage, onToggleTask, pendingTasks }) {
   const [snaps, setSnaps] = useState([])
   useEffect(() => {
     window.onyx.getSnapshots?.().then((d) => setSnaps(d || []))
@@ -224,7 +224,13 @@ export function DashboardMode({ graph, clusters, usage, onSelect, onFilter, sugg
         <section className="dpanel brk panel-in span4" style={{ '--i': 9 }}>
           <div className="u-label">NEEDS ATTENTION</div>
           <div className="rule-ticks" />
-          <div className="dp-sub">ORPHANS {d.health.orphans}</div>
+          {d.health.orphans > 0 ? (
+            <button className="dp-sub orphan-btn" onClick={onTriage} data-tip="Triage orphans — guided linking">
+              ORPHANS {d.health.orphans} · TRIAGE ▸
+            </button>
+          ) : (
+            <div className="dp-sub">ORPHANS 0</div>
+          )}
           {d.cold.slice(0, 5).map((c) => (
             <button key={c.note.id} className="cp-item" onClick={() => onSelect(c.note.id)}>
               <span className="cp-t">{c.note.title}</span>
@@ -248,7 +254,7 @@ export function DashboardMode({ graph, clusters, usage, onSelect, onFilter, sugg
         </section>
 
         <section className="dpanel brk panel-in span4" style={{ '--i': 10 }}>
-          <TasksPanel graph={graph} onSelect={onSelect} limit={16} showEmpty />
+          <TasksPanel graph={graph} onSelect={onSelect} onToggle={onToggleTask} pending={pendingTasks} limit={16} showEmpty />
         </section>
 
         <section className="dpanel brk panel-in span4" style={{ '--i': 11 }}>

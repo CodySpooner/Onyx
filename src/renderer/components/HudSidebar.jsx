@@ -5,7 +5,8 @@ import { degree, cleanFolder } from '../lib/stats.mjs'
 
 const uniq = (a) => [...new Set(a.filter(Boolean))].sort()
 
-export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [], dueCount = 0, onReview, selected = null }) {
+export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [], dueCount = 0, onReview, selected = null, matchCount = null, onToggleTask, pendingTasks }) {
+  const filtering = filter.q || filter.types.length || filter.tags.length || filter.folders.length || filter.statuses.length
   const facets = useMemo(
     () => ({
       types: uniq(graph.notes.map((n) => n.type)),
@@ -31,6 +32,7 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
         value={filter.q}
         onChange={(e) => onFilter({ ...filter, q: e.target.value })}
       />
+      {filtering && matchCount === 0 && <div className="sec-empty">no notes match — clear a filter</div>}
 
       <div className="hud-btnrow">
         <button className="hud-new" onClick={onCreate}>
@@ -133,6 +135,7 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
 
       <div className="hud-sec hubs">
         <div className="sec-h">TOP HUBS</div>
+        {stats.hubs.length === 0 && <div className="sec-empty">no hubs yet — link notes with [[wikilinks]]</div>}
         {stats.hubs.slice(0, 12).map((n) => (
           <button key={n.id} className={`hubrow${n.id === selected ? ' sel' : ''}`} onClick={() => onSelect(n.id)}>
             <i style={{ background: colorOf(n.folder) }} />
@@ -143,7 +146,7 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
       </div>
 
       <div className="hud-sec">
-        <TasksPanel graph={graph} onSelect={onSelect} limit={8} />
+        <TasksPanel graph={graph} onSelect={onSelect} onToggle={onToggleTask} pending={pendingTasks} limit={8} />
       </div>
     </aside>
   )

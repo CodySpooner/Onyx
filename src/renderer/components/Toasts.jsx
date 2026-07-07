@@ -11,7 +11,10 @@ export function Toasts() {
     return bus.on('toast', ({ msg, kind = 'info', ttl = 4000, action = null }) => {
       const id = ++seq
       setItems((cur) => [...cur, { id, msg, kind, action }])
-      setTimeout(() => setItems((cur) => cur.filter((t) => t.id !== id)), action ? Math.max(ttl, 10000) : ttl)
+      const life = action ? Math.max(ttl, 10000) : ttl
+      // fade out instead of vanishing: flag leaving, remove 180ms later
+      setTimeout(() => setItems((cur) => cur.map((t) => (t.id === id ? { ...t, leaving: true } : t))), life)
+      setTimeout(() => setItems((cur) => cur.filter((t) => t.id !== id)), life + 180)
     })
   }, [])
 
@@ -24,7 +27,7 @@ export function Toasts() {
   return (
     <div className="toasts">
       {items.map((t) => (
-        <div key={t.id} className={`toast glass ${t.kind}`}>
+        <div key={t.id} className={`toast glass ${t.kind}${t.leaving ? ' out' : ''}`}>
           {t.msg}
           {t.action && (
             <button className="toast-act" onClick={() => runAction(t)}>

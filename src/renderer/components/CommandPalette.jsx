@@ -17,6 +17,7 @@ export function CommandPalette({ graph, actions, onSelectNote, onClose }) {
   const [q, setQ] = useState('')
   const [idx, setIdx] = useState(0)
   const inputRef = useRef(null)
+  const colorOf = (fid) => (graph.folders.find((f) => f.id === fid) || {}).color || '#8fa2d9'
 
   const results = useMemo(() => {
     const actionHits = fuzzyFilter(q, actions, (a) => a.label, q ? 4 : 6).map((r) => ({
@@ -35,6 +36,7 @@ export function CommandPalette({ graph, actions, onSelectNote, onClose }) {
           key: `n:${r.item.id}`,
           label: r.item.title,
           hint: `${cleanFolder(r.item.folder)} · ${degree(r.item)}⇄`,
+          color: colorOf(r.item.folder),
           indices: r.indices.filter((i) => i < r.item.title.length),
           run: () => onSelectNote(r.item.id)
         })
@@ -48,6 +50,7 @@ export function CommandPalette({ graph, actions, onSelectNote, onClose }) {
           key: `n:${n.id}`,
           label: n.title,
           hint: cleanFolder(n.folder),
+          color: colorOf(n.folder),
           indices: [],
           run: () => onSelectNote(n.id)
         }))
@@ -110,6 +113,7 @@ export function CommandPalette({ graph, actions, onSelectNote, onClose }) {
                   onMouseEnter={() => setIdx(i)}
                   onClick={() => runIdx(i)}
                 >
+                  {r.kind !== 'action' && <i className="prow-dot" style={{ background: r.color }} />}
                   <span className="palette-label">
                     <Marked text={r.label} indices={r.indices} />
                   </span>

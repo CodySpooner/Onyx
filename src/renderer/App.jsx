@@ -25,8 +25,10 @@ import { findTemplateFolder, applyTemplate } from './lib/templates.mjs'
 import { dueCards, grade, prune } from './lib/srs.mjs'
 import { ReviewModal } from './components/ReviewModal.jsx'
 import { pushTrail, pruneTrail, trailBack } from './lib/trail.mjs'
-import { insertWikilink } from './lib/suggest.mjs'
+import { insertWikilink, triageQueue } from './lib/suggest.mjs'
+import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
+import { TriageModal } from './components/TriageModal.jsx'
 
 const skey = (s) => (s.a < s.b ? s.a + '|' + s.b : s.b + '|' + s.a)
 
@@ -57,6 +59,8 @@ export default function App() {
   const trailLoaded = useRef(false)
   const resumeShown = useRef(false)
   const [dismissed, setDismissed] = useState(() => new Set())
+  const [triageRows, setTriageRows] = useState([])
+  const [pendingTasks, setPendingTasks] = useState(() => new Set())
   const lastOpened = useRef(null)
   const announced = useRef(new Set()) // unlock toasts already shown this session
 
@@ -105,6 +109,7 @@ export default function App() {
       const next = pruneTrail(t, live)
       return next.length === t.length ? t : next
     })
+    setPendingTasks(new Set()) // reindex arrived — optimistic task marks resolve
   }, [graph])
 
   // one-shot "resume last session" toast — filter dead entries BEFORE latching,
@@ -420,6 +425,42 @@ export default function App() {
     setReviewQueue(due)
     setOverlay('review')
   }
+  // orphan triage: same frozen-queue discipline
+  const openTriage = () => {
+    setTriageRows(triageQueue(graph.notes, suggestions, dismissed))
+    setOverlay('triage')
+  }
+  const acceptFromTriage = async (s) => {
+    await acceptSuggestion(s)
+    window.onyx.bumpUsage?.('orphanLinked').then(setUsage)
+  }
+
+  // content-guarded task toggle (CORTEX §10): re-read at click, exact-line
+  // match or single relocation, refuse-on-ambiguity — never guess in a vault
+  const toggleTaskAt = async (t) => {
+    const raw = await window.onyx.readNote(t.noteId)
+    if (raw == null) {
+      bus.emit('toast', { msg: '✕ could not read note — toggle aborted', kind: 'err' })
+      return
+    }
+    const res = toggleTask(raw, t.line, t.raw)
+    if (!res) {
+      bus.emit('toast', { msg: '✕ task moved — note changed on disk, try again', kind: 'err' })
+      return
+    }
+    setPendingTasks((p) => new Set(p).add(`${t.noteId}:${t.line}`))
+    const ok = await window.onyx.writeNote(t.noteId, res.next)
+    if (!ok) {
+      setPendingTasks((p) => {
+        const n = new Set(p)
+        n.delete(`${t.noteId}:${t.line}`)
+        return n
+      })
+      bus.emit('toast', { msg: '✕ could not write note', kind: 'err' })
+      return
+    }
+    if (res.nowDone) window.onyx.bumpUsage?.('taskComplete').then(setUsage)
+  }
   const handleGrade = (card, g) => {
     const next = { ...srs, [card.hash]: grade(srs[card.hash], g, Date.now()) }
     setSrs(next)
@@ -454,6 +495,7 @@ export default function App() {
     })),
     { label: 'Quick capture', hint: 'Ctrl+Shift+N', run: () => setOverlay('capture') },
     ...(due.length ? [{ label: `Review due cards (${due.length})`, hint: 'srs', run: openReview }] : []),
+    ...(stats?.orphans ? [{ label: `Triage orphans (${stats.orphans})`, hint: 'inbox', run: openTriage }] : []),
     ...(selected
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
@@ -529,6 +571,9 @@ export default function App() {
               dueCount={due.length}
               onReview={openReview}
               selected={selected}
+              matchCount={activeIds ? activeIds.size : 0}
+              onToggleTask={toggleTaskAt}
+              pendingTasks={pendingTasks}
             />
             <div className="hud-spacer" />
             <Cockpit
@@ -561,6 +606,9 @@ export default function App() {
           suggestions={suggestions}
           onAcceptSuggestion={acceptSuggestion}
           onDismissSuggestion={dismissSuggestion}
+          onTriage={openTriage}
+          onToggleTask={toggleTaskAt}
+          pendingTasks={pendingTasks}
         />
       )}
       {mode === 'skills' && evaluated && <SkillsMode evaluated={evaluated} />}
@@ -576,6 +624,18 @@ export default function App() {
       )}
       {overlay === 'review' && reviewQueue.length > 0 && (
         <ReviewModal due={reviewQueue} onGrade={handleGrade} onClose={() => setOverlay(null)} />
+      )}
+      {overlay === 'triage' && triageRows.length > 0 && (
+        <TriageModal
+          queue={triageRows}
+          graph={graph}
+          onAccept={acceptFromTriage}
+          onOpen={(id) => {
+            setOverlay(null)
+            openNote(id)
+          }}
+          onClose={() => setOverlay(null)}
+        />
       )}
       {selected && (
         <NoteReader
