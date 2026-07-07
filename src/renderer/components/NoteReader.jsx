@@ -1,5 +1,63 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import MarkdownIt from 'markdown-it'
+import { extractLinkContext } from '../lib/backlinks.mjs'
+
+// per-session backlink snippet cache, invalidated by source-note mtime
+const blCache = new Map() // linkingNoteId -> { mtime, snips }
+
+function Backlinks({ note, graph, onSelect }) {
+  const [rows, setRows] = useState([])
+  useEffect(() => {
+    if (!note || !note.inLinks.length) {
+      setRows([])
+      return
+    }
+    let dead = false
+    const targets = new Set([
+      note.title.toLowerCase(),
+      note.id.split('/').pop().replace(/\.md$/, '').toLowerCase()
+    ])
+    const linking = note.inLinks
+      .map((id) => graph.notes.find((n) => n.id === id))
+      .filter(Boolean)
+      .slice(0, 20)
+    Promise.all(
+      linking.map(async (src) => {
+        const hit = blCache.get(src.id)
+        if (hit && hit.mtime === src.mtime && hit.target === note.id) return { src, snips: hit.snips }
+        const raw = await window.onyx.readNote(src.id)
+        const snips = raw == null ? [] : extractLinkContext(raw, targets)
+        blCache.set(src.id, { mtime: src.mtime, target: note.id, snips })
+        return { src, snips }
+      })
+    ).then((r) => {
+      if (!dead) setRows(r)
+    })
+    return () => {
+      dead = true
+    }
+  }, [note?.id, note?.inLinks?.length, graph])
+
+  if (!note || !rows.length) return null
+  return (
+    <div className="backlinks">
+      <div className="u-label">LINKED FROM · {rows.length}</div>
+      <div className="rule-ticks" />
+      {rows.map(({ src, snips }) => (
+        <div key={src.id} className="bl-row">
+          <button className="bl-title" onClick={() => onSelect(src.id)}>
+            {src.title}
+          </button>
+          {snips.map((s, i) => (
+            <div key={i} className="bl-snippet">
+              {s.text}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
 
 // html:true because notes are the user's own trusted vault (same as Obsidian),
 // and wikilinks are injected as HTML anchors before rendering.
@@ -144,6 +202,19 @@ export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTog
               <span key={t} className="chip tag">#{t}</span>
             ))}
             {note?.updated && <span className="chip muted">{String(note.updated)}</span>}
+            {note?.wordCount != null && (
+              <span className="chip muted">
+                {note.wordCount.toLocaleString()} w · {Math.max(1, Math.ceil(note.wordCount / 200))} min
+              </span>
+            )}
+            {note?.mtime && (
+              <span className="chip muted">
+                {(() => {
+                  const d = Math.floor((Date.now() - note.mtime) / 86400000)
+                  return d === 0 ? 'edited today' : `edited ${d}d ago`
+                })()}
+              </span>
+            )}
           </div>
         </div>
         <div className="reader-actions">
@@ -185,6 +256,7 @@ export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTog
       ) : (
         <div className="reader-body" ref={ref} dangerouslySetInnerHTML={{ __html: renderBody(raw, basenameToId) }} />
       )}
+      {!editing && raw != null && <Backlinks note={note} graph={graph} onSelect={onSelect} />}
     </aside>
   )
 }

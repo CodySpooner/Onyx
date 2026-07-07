@@ -454,3 +454,11 @@ button:hover { background: #26335c; }
 }
 
 .taskspanel-h { padding-bottom: 4px; }
+
+/* backlinks (B1) */
+.reader-body { flex: 1; }
+.backlinks { border-top: 1px solid var(--border); padding: 12px 16px; max-height: 220px; overflow-y: auto; }
+.bl-row { margin-top: 8px; }
+.bl-title { background: transparent; border: none; padding: 0; color: var(--accent); font-size: 12px; cursor: pointer; text-align: left; }
+.bl-title:hover { text-shadow: 0 0 8px var(--glow); background: transparent; }
+.bl-snippet { color: var(--text-dim); font-size: 11px; line-height: 1.5; margin: 2px 0 0 10px; border-left: 2px solid var(--hairline); padding-left: 8px; }
