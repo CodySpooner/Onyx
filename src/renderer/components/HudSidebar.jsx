@@ -5,7 +5,7 @@ import { degree, cleanFolder } from '../lib/stats.mjs'
 
 const uniq = (a) => [...new Set(a.filter(Boolean))].sort()
 
-export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [] }) {
+export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [], dueCount = 0, onReview }) {
   const facets = useMemo(
     () => ({
       types: uniq(graph.notes.map((n) => n.type)),
@@ -40,6 +40,12 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
           ◐ Today
         </button>
       </div>
+
+      {dueCount > 0 && (
+        <button className="hud-new review-badge" onClick={onReview}>
+          ▸ REVIEW · {dueCount} DUE
+        </button>
+      )}
 
       {pins.length > 0 && (
         <div className="hud-sec">

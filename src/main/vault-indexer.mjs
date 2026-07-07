@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import matter from 'gray-matter'
 import { parseTasks } from '../renderer/lib/tasks.mjs'
+import { parseCards } from '../renderer/lib/srs.mjs'
 
 const SAFE = /[\\/:*?"<>|#^[\]]/g
 function insideVault(vaultPath, abs) {
@@ -38,6 +39,7 @@ async function walk(dir, acc = []) {
 export async function scanVault(vaultPath) {
   const files = await walk(vaultPath)
   const folders = new Map()
+  const cards = []
   const notes = []
   const byBasename = new Map() // lowercase basename → note id
 
@@ -64,6 +66,7 @@ export async function scanVault(vaultPath) {
       /* best-effort: malformed frontmatter → treat whole file as content */
     }
     const base = path.basename(rel, '.md')
+    const noteTags = normalizeTags(data.tags)
     notes.push({
       id: rel,
       path: rel,
@@ -71,7 +74,7 @@ export async function scanVault(vaultPath) {
       folder: folderId,
       type: data.type ?? null,
       status: data.status ?? null,
-      tags: normalizeTags(data.tags),
+      tags: noteTags,
       updated: data.updated instanceof Date ? data.updated.toISOString().slice(0, 10) : (data.updated ?? null),
       mtime: mtime ?? (Number.isFinite(Date.parse(data.updated)) ? Date.parse(data.updated) : Date.now()),
       wordCount: content.split(/\s+/).filter(Boolean).length,
@@ -80,6 +83,7 @@ export async function scanVault(vaultPath) {
       inLinks: [],
       _content: content
     })
+    cards.push(...parseCards(rel, raw, noteTags))
     byBasename.set(base.toLowerCase(), rel)
   }
 
@@ -107,6 +111,7 @@ export async function scanVault(vaultPath) {
   const publicNotes = notes.map(({ _content, ...n }) => n)
   return {
     folders: [...folders.values()],
+    cards,
     notes: publicNotes,
     links,
     meta: {

@@ -22,6 +22,8 @@ import { CommandPalette } from './components/CommandPalette.jsx'
 import { QuickCapture } from './components/QuickCapture.jsx'
 import { dailyId, dailyTemplate, appendCapture } from './lib/daily.mjs'
 import { findTemplateFolder, applyTemplate } from './lib/templates.mjs'
+import { dueCards, grade, prune } from './lib/srs.mjs'
+import { ReviewModal } from './components/ReviewModal.jsx'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -42,6 +44,8 @@ export default function App() {
   const [focusMode, setFocusMode] = useState(false)
   const [pins, setPins] = useState([])
   const [flyTo, setFlyTo] = useState(null)
+  const [srs, setSrs] = useState({})
+  const srsStamped = useRef(false)
   const lastOpened = useRef(null)
   const announced = useRef(new Set()) // unlock toasts already shown this session
 
@@ -66,7 +70,28 @@ export default function App() {
       setPins(Array.isArray(c.pins) ? c.pins : [])
     })
     window.onyx.getUsage?.().then(setUsage)
+    window.onyx.storeGet?.('srs').then((s) => setSrs(prune(s?.states || {}, Date.now())))
   }, [])
+
+  // once per session: refresh lastSeen for cards still present in the vault
+  // so the 60d prune never eats a live card's schedule
+  useEffect(() => {
+    if (srsStamped.current || !graph?.cards?.length) return
+    srsStamped.current = true
+    setSrs((prev) => {
+      const now = Date.now()
+      let changed = false
+      const next = { ...prev }
+      for (const c of graph.cards) {
+        if (next[c.hash]) {
+          next[c.hash] = { ...next[c.hash], lastSeen: now }
+          changed = true
+        }
+      }
+      if (changed) window.onyx.storeSet?.('srs', { states: next })
+      return changed ? next : prev
+    })
+  }, [graph])
 
   // debounced search counter (Explorer branch fuel)
   useEffect(() => {
@@ -259,6 +284,14 @@ export default function App() {
   const templateFolder = graph ? findTemplateFolder(graph.folders) : null
   const templates = templateFolder ? graph.notes.filter((n) => n.folder === templateFolder) : []
 
+  const due = graph?.cards ? dueCards(graph.cards, srs, Date.now()) : []
+  const handleGrade = (card, g) => {
+    const next = { ...srs, [card.hash]: grade(srs[card.hash], g, Date.now()) }
+    setSrs(next)
+    window.onyx.storeSet?.('srs', { states: next })
+    window.onyx.bumpUsage?.('reviewsDone').then(setUsage)
+  }
+
   const togglePin = (id) => {
     if (!id) return
     const adding = !pins.includes(id)
@@ -285,6 +318,7 @@ export default function App() {
       run: () => createFromTemplate(t.id)
     })),
     { label: 'Quick capture', hint: 'Ctrl+Shift+N', run: () => setOverlay('capture') },
+    ...(due.length ? [{ label: `Review due cards (${due.length})`, hint: 'srs', run: () => setOverlay('review') }] : []),
     ...(selected
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
@@ -354,6 +388,8 @@ export default function App() {
               onCreate={handleCreate}
               onOpenDaily={openDaily}
               pins={pins}
+              dueCount={due.length}
+              onReview={() => setOverlay('review')}
             />
             <div className="hud-spacer" />
             <Cockpit
@@ -395,6 +431,9 @@ export default function App() {
           onCapture={handleCapture}
           onClose={() => setOverlay(null)}
         />
+      )}
+      {overlay === 'review' && due.length > 0 && (
+        <ReviewModal due={due} onGrade={handleGrade} onClose={() => setOverlay(null)} />
       )}
       {selected && (
         <NoteReader

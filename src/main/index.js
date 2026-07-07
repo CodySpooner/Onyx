@@ -6,6 +6,7 @@ import { scanVault, readNoteRaw, writeNoteRaw, createNote, deleteNote, renameNot
 import { loadConfig, saveConfig } from './config.js'
 import { setupUpdater, installUpdate } from './updater.js'
 import { loadUsage, bumpUsage, markUnlocked, loadSnapshots, recordSnapshot, flush } from './appdata.js'
+import { storeGet, storeSet } from './store.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let win
@@ -155,6 +156,8 @@ ipcMain.handle('usage:get', () => loadUsage())
 ipcMain.handle('usage:bump', (_e, name, n) => bumpUsage(name, n))
 ipcMain.handle('usage:markUnlocked', (_e, ids) => markUnlocked(ids))
 ipcMain.handle('snapshots:get', () => loadSnapshots().days)
+ipcMain.handle('store:get', (_e, name) => storeGet(name))
+ipcMain.handle('store:set', (_e, name, data) => storeSet(name, data))
 ipcMain.handle('vault:ensureNote', async (_e, rel, content) => {
   const { vaultPath } = loadConfig()
   try {

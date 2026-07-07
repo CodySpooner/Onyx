@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('onyx', {
   bumpUsage: (name, n) => ipcRenderer.invoke('usage:bump', name, n),
   markUnlocked: (ids) => ipcRenderer.invoke('usage:markUnlocked', ids),
   getSnapshots: () => ipcRenderer.invoke('snapshots:get'),
+  storeGet: (name) => ipcRenderer.invoke('store:get', name),
+  storeSet: (name, data) => ipcRenderer.invoke('store:set', name, data),
   ensureNote: (rel, content) => ipcRenderer.invoke('vault:ensureNote', rel, content),
   onUpdate: (cb) => {
     const h = (_e, s) => cb(s)
