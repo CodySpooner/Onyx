@@ -6,6 +6,7 @@ import { parseTasks } from '../renderer/lib/tasks.mjs'
 import { parseCards } from '../renderer/lib/srs.mjs'
 import { parseHabitLines, dailyDateFromId } from '../renderer/lib/habits.mjs'
 import { buildSuggestions } from '../renderer/lib/suggest.mjs'
+import { makeExcerpt } from '../renderer/lib/notesmode.mjs'
 
 const SAFE = /[\\/:*?"<>|#^[\]]/g
 function insideVault(vaultPath, abs) {
@@ -54,10 +55,14 @@ export async function scanVault(vaultPath) {
     }
     const raw = await fs.readFile(abs, 'utf8')
     let mtime
+    let ctime
     try {
-      mtime = Math.round((await fs.stat(abs)).mtimeMs)
+      const st = await fs.stat(abs)
+      mtime = Math.round(st.mtimeMs)
+      ctime = Math.round(st.birthtimeMs) || mtime // some filesystems zero birthtime
     } catch {
       mtime = null
+      ctime = null
     }
     let data = {}
     let content = raw
@@ -82,6 +87,8 @@ export async function scanVault(vaultPath) {
       url: data.url ? String(data.url) : null,
       read: data.read === true,
       mtime: mtime ?? (Number.isFinite(Date.parse(data.updated)) ? Date.parse(data.updated) : Date.now()),
+      ctime: ctime ?? mtime ?? Date.now(),
+      excerpt: makeExcerpt(content),
       wordCount: content.split(/\s+/).filter(Boolean).length,
       tasks: parseTasks(raw, rel),
       outLinks: [],
