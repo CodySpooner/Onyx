@@ -235,6 +235,17 @@ export class CoreView {
     this.composer.setSize(w, h)
   }
 
+  setPaused(p) {
+    this.paused = !!p
+    if (this.paused) {
+      cancelAnimationFrame(this._raf)
+      this._raf = null
+    } else if (!this._raf) {
+      this.clock.getDelta() // eat the pause gap so dt doesn't jump
+      this._loop()
+    }
+  }
+
   dispose() {
     cancelAnimationFrame(this._raf)
     this.renderer.domElement.removeEventListener('pointermove', this._onMove)

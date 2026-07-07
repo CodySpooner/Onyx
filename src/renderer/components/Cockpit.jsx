@@ -13,10 +13,10 @@ function Spark({ weeks }) {
   )
 }
 
-export function Cockpit({ graph, onSelect }) {
+export function Cockpit({ graph, clusters, onSelect }) {
   const d = useMemo(() => {
     const now = Date.now()
-    const { clusterOf, clusterCount } = detectClusters(graph.notes.map((n) => n.id), graph.links)
+    const { clusterOf, clusterCount } = clusters ?? detectClusters(graph.notes.map((n) => n.id), graph.links)
     const vel = velocity(graph.notes, now)
     const cold = coldNotes(graph.notes, now)
     const br = bridgeStats(graph.links, clusterOf)
@@ -30,7 +30,7 @@ export function Cockpit({ graph, onSelect }) {
       links: graph.links
     })
     return { clusterCount, vel, cold, br, mat, acts }
-  }, [graph])
+  }, [graph, clusters])
 
   const titleOf = (id) => graph.notes.find((n) => n.id === id)?.title || id
 
