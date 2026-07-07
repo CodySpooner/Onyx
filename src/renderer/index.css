@@ -951,7 +951,9 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .ws-check .num { margin-left: auto; color: var(--text-faint); font-size: 10px; }
 
 /* ── customize drawer ── */
-.czdrawer { position: fixed; right: 72px; top: 96px; bottom: 48px; width: 320px; z-index: 8; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; }
+/* pointer-events: auto is load-bearing — .hud-body disables events for the
+   whole HUD layer and every interactive panel must opt back in */
+.czdrawer { position: fixed; right: 72px; top: 96px; bottom: 48px; width: 320px; z-index: 8; border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; pointer-events: auto; }
 .cz-head { display: flex; align-items: center; justify-content: space-between; }
 .cz-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; padding-top: 10px; }
 .cz-sec { display: flex; flex-direction: column; gap: 8px; }

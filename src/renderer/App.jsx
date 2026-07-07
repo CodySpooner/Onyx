@@ -240,12 +240,16 @@ export default function App() {
     const all = new Set([...auto.map((w) => w.id), ...ok.manual.map((w) => w.id)])
     if (ok.activeId || (wsStore.activeId && all.has(wsStore.activeId))) {
       setWorkspaceId(wsStore.activeId)
-      // booting scoped must be LOUD — a silently restored workspace reads as
-      // "my vault is gone" (1 note showing, no obvious cause)
-      const w = [...auto, ...ok.manual].find((x) => x.id === wsStore.activeId)
-      if (w) bus.emit('toast', { msg: `◈ workspace: ${w.name} — click the ● pill by search for ALL VAULT` })
     }
   }, [graph, wsStore])
+  // every workspace activation is LOUD — a silently scoped slate (boot
+  // restore OR pill click into a tiny project) reads as "my vault is gone"
+  useEffect(() => {
+    if (!workspaceId || !activeWs || !scoped) return
+    const n = scoped.notes.length
+    bus.emit('toast', { msg: `◈ ${activeWs.name} — ${n} note${n === 1 ? '' : 's'} in scope · ● pill → ALL VAULT` })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId])
   // a new slate means a clean slate: folder/tag filters from the previous
   // scope rarely exist in the next one and would dim everything chip-lessly
   useEffect(() => {
