@@ -1,12 +1,12 @@
 # ◑ Onyx
 
-A desktop app that renders an Obsidian vault as an explorable **galaxy of solar
-systems** — each folder a glowing sun, each note a planet orbiting it, each
-wikilink a glowing arc. A dramatically better-looking, better-organized
-alternative to Obsidian's built-in graph view.
+**Your mind, upgraded.** A desktop second brain that renders your Obsidian
+vault as a living neural network — clusters emerge from your links, synapses
+fire between thoughts, and a floating glass cockpit tracks the health of your
+knowledge. Read, edit, create, and rewire notes without leaving the brain.
 
-Editing stays in Obsidian for now — Onyx is the read-only "map layer" (editing
-is a planned later slice).
+The AI Knowledge Engine (auto-summaries, suggested links, semantic search,
+chat) arrives in upcoming slices — the hover card already reserves its seat.
 
 ## Run
 
@@ -23,17 +23,24 @@ at any folder of `.md` files.
 
 ## Views
 
-- **☀ Solar System** — folders as suns, notes orbiting them, all wikilinks
-  glowing at once (toggle **links** off for a calm, hover-only web). Click a sun
-  to fly into its system; click a planet to read the note.
-- **✦ Constellation** — the same graph as a folder-clustered node cloud.
+- **🧠 Brain** (default) — your vault as a living neural network: force-directed
+  layout where lobes emerge from links, synapses fire along connections, hover
+  previews any thought (click pins it, double-click opens it), and the cockpit
+  tracks maturity, velocity, cold notes, bridges, and next actions.
+- **☀ Solar System** — folders as suns, notes orbiting, links glowing.
+- **◉ Core of Everything** — core star with teardrop rings + radial fan.
+- **⊕ Second Brain** — spherical shells around a glowing core.
+- **✦ Constellation** — folder-clustered node cloud.
 
 ## Features
 
-- Reads your real vault live (frontmatter, tags, wikilinks) and re-indexes on
-  file changes.
-- Click any planet → rendered markdown reader with clickable `[[wikilinks]]`.
+- Reads your real vault live (frontmatter, tags, wikilinks, mtimes) and
+  re-indexes on file changes.
+- Edit & save with side-by-side live preview; create, rename, delete notes —
+  all writes guarded to the vault.
+- Rendered markdown reader with clickable `[[wikilinks]]`.
 - Search + filter by folder / type / tag — matches glow, the rest dim.
+- Auto-updates from GitHub Releases with a restart-to-install toast.
 
 ## Test
 
