@@ -23,7 +23,9 @@ jobs:
       - run: npm test
       # Build only — electron-builder's own GitHub uploader silently dropped
       # large assets twice (v0.2.2, v0.3.0), so publishing is handled below.
-      - run: npm run dist
+      # --publish never stops electron-builder auto-publishing on CI tags
+      # (it fails fast wanting a token otherwise).
+      - run: npm run dist -- --publish never
       - name: Stage assets with updater-exact names
         shell: bash
         run: |
