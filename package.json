@@ -1,6 +1,6 @@
 {
   "name": "onyx",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Solar-system visual notes app over an Obsidian vault",
   "author": "Cody Spooner <xody2x@gmail.com>",
   "main": "out/main/index.js",
