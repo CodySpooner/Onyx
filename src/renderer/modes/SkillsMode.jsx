@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { hashAngle } from '../lib/graph.mjs'
 import { BRANCH_COLORS } from '../lib/skills.mjs'
+import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
+import { arsenalLayout, displayName } from '../lib/installed-skills.mjs'
 
 const BRANCH_ORDER = ['INTELLIGENCE', 'MEMORY', 'ARCHITECT', 'CARTOGRAPHER', 'RITUALIST', 'CURATOR', 'EXPLORER']
 const ROMAN = ['I', 'II', 'III', 'IV', 'V']
@@ -11,8 +13,103 @@ function polar(angleDeg, r) {
   return [Math.cos(a) * r, Math.sin(a) * r]
 }
 
+// The machine's real installed Claude skills, as a constellation of their own.
+function Arsenal({ arsenal, onHover }) {
+  const layout = useMemo(() => {
+    if (!arsenal?.skills?.length) return null
+    const groups = new Map()
+    const sorted = [...arsenal.skills].sort((a, b) => a.group.localeCompare(b.group))
+    for (const s of sorted) {
+      if (!groups.has(s.group)) groups.set(s.group, [])
+      groups.get(s.group).push(s)
+    }
+    const { placed, sectors } = arsenalLayout(groups)
+    const colorOf = new Map(sectors.map((sec, i) => [sec.group, CLUSTER_PALETTE[i % CLUSTER_PALETTE.length]]))
+    // parent = nearest-angle node one arc inward (or the core for arc 0)
+    const edges = placed.map((p) => {
+      if (p.arc === 0) return { id: p.id, from: { x: 0, y: 0 }, to: p }
+      const inward = placed.filter((q) => q.skill.group === p.skill.group && q.arc === p.arc - 1)
+      let best = inward[0]
+      for (const q of inward) {
+        if (Math.abs(q.angle - p.angle) < Math.abs((best?.angle ?? 1e9) - p.angle)) best = q
+      }
+      return { id: p.id, from: best || { x: 0, y: 0 }, to: p }
+    })
+    return { placed, sectors, edges, colorOf }
+  }, [arsenal])
+
+  if (!layout) {
+    return (
+      <div className="arsenal-empty u-label">
+        NO CLAUDE SKILLS DETECTED · ~/.claude/skills
+      </div>
+    )
+  }
+
+  const edgePath = ({ from, to }) => {
+    const mx = (from.x + to.x) / 2
+    const my = (from.y + to.y) / 2
+    const cx = mx - (to.y - from.y) * 0.12
+    const cy = my + (to.x - from.x) * 0.12
+    return `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`
+  }
+
+  return (
+    <svg className="skills-svg" viewBox="-620 -540 1240 1080">
+      {layout.edges.map((e) => {
+        const col = layout.colorOf.get(e.to.skill.group)
+        return (
+          <g key={e.id}>
+            <path d={edgePath(e)} fill="none" stroke={col} strokeOpacity="0.35" strokeWidth="1.2" />
+            <circle r="2" fill={col}>
+              <animateMotion dur="3.4s" repeatCount="indefinite" path={edgePath(e)} begin={`${(hashAngle(e.id) / (Math.PI * 2)) * 3.4}s`} />
+            </circle>
+          </g>
+        )
+      })}
+      <g className="st-core">
+        <circle r="26" fill="var(--card)" stroke="rgba(255,255,255,0.14)" />
+        <circle r="32" fill="none" stroke="var(--accent)" strokeOpacity="0.4" strokeDasharray="1 3" className="st-spin" />
+        <text y="-2" textAnchor="middle" className="st-lvl num">{arsenal.skills.length}</text>
+        <text y="12" textAnchor="middle" className="st-lvl-cap">SKILLS</text>
+      </g>
+      {layout.placed.map((p) => {
+        const col = layout.colorOf.get(p.skill.group)
+        return (
+          <g
+            key={p.id}
+            transform={`translate(${p.x} ${p.y})`}
+            className="st-node unlocked"
+            onMouseEnter={(e) => onHover({ arsenalSkill: p.skill, color: col, x: e.clientX, y: e.clientY })}
+            onMouseLeave={() => onHover(null)}
+          >
+            <circle r="13" fill={col} opacity="0.14" />
+            <circle r="7" fill={col} stroke={col} />
+            <text y="20" textAnchor="middle" className="st-name" fill="var(--text)">
+              {displayName(p.skill)}
+            </text>
+          </g>
+        )
+      })}
+      {layout.sectors.map((sec) => {
+        const [x, y] = polar(sec.mid, 470)
+        return (
+          <text key={sec.group} x={x} y={y} textAnchor="middle" className="st-branch" fill={layout.colorOf.get(sec.group)}>
+            {sec.group} · {sec.count}
+          </text>
+        )
+      })}
+    </svg>
+  )
+}
+
 export function SkillsMode({ evaluated }) {
-  const [hover, setHover] = useState(null) // { skill, x, y }
+  const [hover, setHover] = useState(null) // { skill | arsenalSkill, x, y }
+  const [tab, setTab] = useState('cortex')
+  const [arsenal, setArsenal] = useState(null)
+  useEffect(() => {
+    window.onyx.getInstalledSkills?.().then(setArsenal)
+  }, [])
   const layout = useMemo(() => {
     const nodes = new Map()
     for (const s of evaluated.skills) {
@@ -50,16 +147,27 @@ export function SkillsMode({ evaluated }) {
   return (
     <div className="mode-scrim skills-scrim" onMouseMove={(e) => hover && setHover({ ...hover, x: e.clientX, y: e.clientY })}>
       <div className="skills-head">
-        <span className="u-label">CORTEX · SKILL TREE</span>
+        <span className="skills-tabs">
+          <button className={`u-label sk-tab${tab === 'cortex' ? ' on' : ''}`} onClick={() => setTab('cortex')}>
+            CORTEX
+          </button>
+          <button className={`u-label sk-tab${tab === 'arsenal' ? ' on' : ''}`} onClick={() => setTab('arsenal')}>
+            ARSENAL{arsenal?.skills?.length ? ` · ${arsenal.skills.length}` : ''}
+          </button>
+        </span>
         <div className="skills-xp">
           <span className="num">
-            {evaluated.xp.toLocaleString()} XP · LV {evaluated.level} {evaluated.title} · {evaluated.unlockedCount}/{evaluated.totalCount} UNLOCKED
+            {tab === 'cortex'
+              ? `${evaluated.xp.toLocaleString()} XP · LV ${evaluated.level} ${evaluated.title} · ${evaluated.unlockedCount}/${evaluated.totalCount} UNLOCKED`
+              : `${arsenal?.skills?.length || 0} CLAUDE SKILLS INSTALLED ON THIS MACHINE`}
           </span>
           <span className="rule-progress">
-            <i style={{ width: `${Math.round(evaluated.levelPct * 100)}%` }} />
+            <i style={{ width: tab === 'cortex' ? `${Math.round(evaluated.levelPct * 100)}%` : '100%' }} />
           </span>
         </div>
       </div>
+      {tab === 'arsenal' && <Arsenal arsenal={arsenal} onHover={setHover} />}
+      {tab === 'cortex' && (
       <svg className="skills-svg" viewBox="-620 -540 1240 1080">
         {/* edges */}
         {layout.edges.map((e) => {
@@ -138,8 +246,26 @@ export function SkillsMode({ evaluated }) {
           </text>
         ))}
       </svg>
+      )}
 
-      {hover && (
+      {hover && hover.arsenalSkill && (
+        <div
+          className="skillcard glass"
+          style={{
+            left: Math.min(hover.x + 16, window.innerWidth - 300),
+            top: Math.min(hover.y + 12, window.innerHeight - 220)
+          }}
+        >
+          <div className="sk-name" style={{ color: hover.color }}>{hover.arsenalSkill.name}</div>
+          <div className="u-label">
+            {hover.arsenalSkill.group} ·{' '}
+            {hover.arsenalSkill.source === 'plugin' ? `PLUGIN v${hover.arsenalSkill.version}` : 'USER SKILL'}
+          </div>
+          {hover.arsenalSkill.blurb && <div className="sk-flavor">“{hover.arsenalSkill.blurb}”</div>}
+        </div>
+      )}
+
+      {hover && hover.skill && (
         <div
           className="skillcard glass"
           style={{

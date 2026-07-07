@@ -626,3 +626,10 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .minimap .mm-svg { max-height: 170px; }
 .backlinks { max-height: 150px; }
 .suggests { max-height: 160px; overflow-y: auto; }
+
+/* ARSENAL tab (installed Claude skills) */
+.skills-tabs { display: inline-flex; gap: 18px; }
+.sk-tab { background: transparent; border: none; cursor: pointer; color: var(--text-faint); padding: 2px 0; border-bottom: 1px solid transparent; }
+.sk-tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.sk-tab:hover { color: var(--text-dim); }
+.arsenal-empty { display: flex; align-items: center; justify-content: center; height: 60vh; }
