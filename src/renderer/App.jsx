@@ -401,6 +401,7 @@ export default function App() {
               pins={pins}
               dueCount={due.length}
               onReview={openReview}
+              selected={selected}
             />
             <div className="hud-spacer" />
             <Cockpit

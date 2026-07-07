@@ -174,8 +174,10 @@ export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTog
     } else if (!nid) alert('Rename failed — the name may already be taken.')
   }
 
+  const fcolor = (graph.folders.find((f) => f.id === note?.folder) || {}).color
+
   return (
-    <aside className={`reader ${editing ? 'editing' : ''}`}>
+    <aside className={`reader ${editing ? 'editing' : ''}`} style={{ '--c': fcolor }}>
       <div className="reader-head">
         <div>
           {renaming ? (
@@ -250,9 +252,12 @@ export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTog
           </div>
         </div>
       ) : raw == null ? (
-        <p className="muted" style={{ padding: 16 }}>
-          loading…
-        </p>
+        <div className="reader-body">
+          <div className="skel" style={{ width: '82%' }} />
+          <div className="skel" style={{ width: '95%' }} />
+          <div className="skel" style={{ width: '60%' }} />
+          <div className="skel" style={{ width: '88%' }} />
+        </div>
       ) : (
         <div className="reader-body" ref={ref} dangerouslySetInnerHTML={{ __html: renderBody(raw, basenameToId) }} />
       )}

@@ -5,7 +5,7 @@ import { degree, cleanFolder } from '../lib/stats.mjs'
 
 const uniq = (a) => [...new Set(a.filter(Boolean))].sort()
 
-export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [], dueCount = 0, onReview }) {
+export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [], dueCount = 0, onReview, selected = null }) {
   const facets = useMemo(
     () => ({
       types: uniq(graph.notes.map((n) => n.type)),
@@ -54,7 +54,7 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
             .map((id) => graph.notes.find((n) => n.id === id))
             .filter(Boolean)
             .map((n) => (
-              <button key={n.id} className="hubrow" onClick={() => onSelect(n.id)}>
+              <button key={n.id} className={`hubrow${n.id === selected ? ' sel' : ''}`} onClick={() => onSelect(n.id)}>
                 <i style={{ background: colorOf(n.folder) }} />
                 <span className="hub-t">{n.title}</span>
                 <span className="hub-d">◉</span>
@@ -134,7 +134,7 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
       <div className="hud-sec hubs">
         <div className="sec-h">TOP HUBS</div>
         {stats.hubs.slice(0, 12).map((n) => (
-          <button key={n.id} className="hubrow" onClick={() => onSelect(n.id)}>
+          <button key={n.id} className={`hubrow${n.id === selected ? ' sel' : ''}`} onClick={() => onSelect(n.id)}>
             <i style={{ background: colorOf(n.folder) }} />
             <span className="hub-t">{n.title}</span>
             <span className="hub-d">{degree(n)}</span>
