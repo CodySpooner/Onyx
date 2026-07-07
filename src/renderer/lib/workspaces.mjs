@@ -4,6 +4,12 @@
 // subgraph every mode can consume unchanged (same shape as the real graph).
 import { CLUSTER_PALETTE } from './clusters.mjs'
 import { PROJECT_FOLDER } from './projects.mjs'
+import { hashAngle } from './graph.mjs'
+
+// stable color for a workspace name — survives list reordering
+export function pickColor(name) {
+  return CLUSTER_PALETTE[Math.floor((hashAngle(String(name)) / (Math.PI * 2)) * CLUSTER_PALETTE.length) % CLUSTER_PALETTE.length]
+}
 
 const CLOSURE_CAP = 200
 
@@ -32,9 +38,16 @@ export function deriveAutoWorkspaces(graph) {
 export function noteInWorkspace(ws, note) {
   if (!ws) return true
   if (ws.auto) return ws._set ? ws._set.has(note.id) : ws.noteIds.includes(note.id)
+  // manual membership is the UNION: folders ∪ tags ∪ hand-picked noteIds
   const inFolder = ws.folders?.length ? ws.folders.includes(note.folder) : false
   const inTags = ws.tags?.length ? (note.tags || []).some((t) => ws.tags.includes(t)) : false
-  return inFolder || inTags
+  const inIds = ws.noteIds?.length ? ws.noteIds.includes(note.id) : false
+  return inFolder || inTags || inIds
+}
+
+// the full selectable list: auto (from project logs) first, then manual
+export function buildWorkspaces(graph, manual = []) {
+  return [...deriveAutoWorkspaces(graph), ...manual]
 }
 
 // the new slate: same graph shape, scoped membership; links need both ends
@@ -64,7 +77,8 @@ export function scopeGraph(graph, ws) {
       ...graph.meta,
       noteCount: scopedNotes.length,
       linkCount: links.length,
-      unresolvedLinkCount: (graph.unresolved || []).filter((u) => keep.has(u.in)).length
+      unresolvedLinkCount: (graph.unresolved || []).filter((u) => keep.has(u.in)).length,
+      scope: ws.name // StatusBar scope segment reads this
     }
   }
 }

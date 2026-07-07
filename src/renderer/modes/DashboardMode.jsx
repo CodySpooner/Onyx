@@ -158,7 +158,7 @@ export function DashboardMode({
   graph, clusters, usage, onSelect, onFilter,
   suggestions = [], onAcceptSuggestion, onDismissSuggestion,
   onTriage, onToggleTask, pendingTasks,
-  dueCount = 0, onReview, onOpenDaily, onCapture, dailyFolder = '06 - Daily Logs'
+  dueCount = 0, onReview, onOpenDaily, onCapture, dailyFolder = '06 - Daily Logs', fullGraph = null
 }) {
   const [page, setPage] = useState('overview')
   const pageLoaded = useRef(false)
@@ -254,7 +254,7 @@ export function DashboardMode({
     window.onyx.getVersion?.().then((v) => v && setAppVersion(v))
   }, [])
   const exportDigest = async () => {
-    const md = buildAgentDigest({ graph, now: Date.now(), version: appVersion })
+    const md = buildAgentDigest({ graph: fullGraph || graph, now: Date.now(), version: appVersion }) // digest is ALWAYS whole-vault
     const r = await window.onyx.ensureNote?.(DIGEST_ID, md)
     if (r?.created) {
       bus.emit('toast', { msg: '⇪ agent digest exported', kind: 'skill' })

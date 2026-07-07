@@ -30,6 +30,8 @@ import { insertWikilink, triageQueue } from './lib/suggest.mjs'
 import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
 import { TriageModal } from './components/TriageModal.jsx'
+import { buildWorkspaces, scopeGraph, validateWorkspaceUi } from './lib/workspaces.mjs'
+import { WorkspacePill, WorkspaceModal } from './components/WorkspacePill.jsx'
 import { FindReplaceModal } from './components/FindReplaceModal.jsx'
 import { NotesMode } from './modes/NotesMode.jsx'
 
@@ -64,6 +66,11 @@ export default function App() {
   const [dismissed, setDismissed] = useState(() => new Set())
   const [triageRows, setTriageRows] = useState([])
   const [pendingTasks, setPendingTasks] = useState(() => new Set())
+  const [wsManual, setWsManual] = useState([])
+  const [workspaceId, setWorkspaceId] = useState(null)
+  const [wsModal, setWsModal] = useState(null) // null | 'new' | workspace object
+  const wsLoaded = useRef(false)
+  const wsPending = useRef(null)
   const [quests, setQuests] = useState(null)
   const [questsLoaded, setQuestsLoaded] = useState(false)
   const lastOpened = useRef(null)
@@ -100,6 +107,9 @@ export default function App() {
     })
     window.onyx.storeGet?.('suggest-dismissed').then((d) => {
       if (Array.isArray(d?.keys)) setDismissed(new Set(d.keys))
+    })
+    Promise.all([window.onyx.storeGet?.('workspaces'), window.onyx.storeGet?.('workspace-ui')]).then(([w, ui]) => {
+      wsPending.current = { manual: w?.manual, activeId: ui?.activeId }
     })
     window.onyx.storeGet?.('quests').then((qs) => {
       setQuests(qs || null)
@@ -193,15 +203,64 @@ export default function App() {
       setOverlay,
       setShowAllLinks,
       setShowLabels,
-      hover: (id) => bus.emit('hover', { id, x: 620, y: 320, pinned: true })
+      hover: (id) => bus.emit('hover', { id, x: 620, y: 320, pinned: true }),
+      setWorkspace: (id) => setWorkspaceId(id)
     }
   }, [])
 
+  // ── project workspaces: scoping is a VIEW over the vault, never a move ──
+  const workspaces = useMemo(() => (graph ? buildWorkspaces(graph, wsManual) : []), [graph, wsManual])
+  const activeWs = workspaces.find((w) => w.id === workspaceId) || null
+  const scoped = useMemo(() => (graph && activeWs ? scopeGraph(graph, activeWs) : graph), [graph, activeWs])
+
+  // validate persisted workspace state once the graph exists
+  useEffect(() => {
+    if (!graph || wsLoaded.current || !wsPending.current) return
+    wsLoaded.current = true
+    const auto = buildWorkspaces(graph, [])
+    const ok = validateWorkspaceUi({ activeId: wsPending.current.activeId, manual: wsPending.current.manual }, auto)
+    setWsManual(ok.manual)
+    // manual ids validate against the loaded manual list too
+    const all = new Set([...auto.map((w) => w.id), ...ok.manual.map((w) => w.id)])
+    if (ok.activeId || (wsPending.current.activeId && all.has(wsPending.current.activeId))) {
+      setWorkspaceId(wsPending.current.activeId)
+    }
+  }, [graph])
+  // deleted project log → its auto workspace evaporates: fall back loudly
+  useEffect(() => {
+    if (!graph || !wsLoaded.current || !workspaceId) return
+    if (!workspaces.some((w) => w.id === workspaceId)) {
+      setWorkspaceId(null)
+      bus.emit('toast', { msg: '◈ workspace no longer exists — back to ALL VAULT', kind: 'err' })
+    }
+  }, [graph, workspaces, workspaceId])
+  useEffect(() => {
+    if (wsLoaded.current) window.onyx.storeSet?.('workspace-ui', { activeId: workspaceId })
+  }, [workspaceId])
+  useEffect(() => {
+    if (wsLoaded.current) window.onyx.storeSet?.('workspaces', { manual: wsManual })
+  }, [wsManual])
+  const saveWorkspace = (w) => {
+    setWsManual((prev) => {
+      const at = prev.findIndex((x) => x.id === w.id)
+      const next = at >= 0 ? prev.map((x) => (x.id === w.id ? w : x)) : [...prev, w]
+      return next.slice(0, 20)
+    })
+    setWsModal(null)
+    setWorkspaceId(w.id)
+  }
+  const deleteWorkspace = (id) => {
+    setWsManual((prev) => prev.filter((x) => x.id !== id))
+    if (workspaceId === id) setWorkspaceId(null)
+    setWsModal(null)
+  }
+
+
   // hoisted graph-derived data (computed once per graph)
-  const stats = useMemo(() => (graph ? vaultStats(graph) : null), [graph])
+  const stats = useMemo(() => (scoped ? vaultStats(scoped) : null), [scoped])
   const clusters = useMemo(
-    () => (graph ? detectClusters(graph.notes.map((n) => n.id), graph.links) : { clusterCount: 0, clusterOf: new Map() }),
-    [graph]
+    () => (scoped ? detectClusters(scoped.notes.map((n) => n.id), scoped.links) : { clusterCount: 0, clusterOf: new Map() }),
+    [scoped]
   )
   // expensive graph-only half memoized on [graph]; cheap usage merge per bump
   const graphSkillStats = useMemo(() => (graph ? buildGraphSkillStats(graph, Date.now()) : null), [graph])
@@ -282,9 +341,9 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const activeIds = graph ? new Set(graph.notes.filter((n) => matchFilter(n, filter)).map((n) => n.id)) : null
-  const filtering = graph ? activeIds.size !== graph.notes.length : false
-  const featured = graph ? graph.notes.find((n) => n.id === selected) || stats.hubs[0] : null
+  const activeIds = scoped ? new Set(scoped.notes.filter((n) => matchFilter(n, filter)).map((n) => n.id)) : null
+  const filtering = scoped ? activeIds.size !== scoped.notes.length : false
+  const featured = scoped ? scoped.notes.find((n) => n.id === selected) || stats.hubs[0] : null
 
   // the ONE dirty-guarded selection choke point — every note-switch routes here
   const guardDirty = () => !kbRef.current.dirty || window.confirm('Discard unsaved edits?')
@@ -414,8 +473,8 @@ export default function App() {
 
   // Synapse Suggestions: engine runs in the indexer; renderer filters dismissals
   const suggestions = useMemo(
-    () => (graph?.suggestions || []).filter((s) => !dismissed.has(skey(s))),
-    [graph, dismissed]
+    () => (scoped?.suggestions || []).filter((s) => !dismissed.has(skey(s))),
+    [scoped, dismissed]
   )
   const titleOf = (id) => graph?.notes.find((n) => n.id === id)?.title || id
   const dismissSuggestion = (s) => {
@@ -481,7 +540,7 @@ export default function App() {
   }
   // orphan triage: same frozen-queue discipline
   const openTriage = () => {
-    setTriageRows(triageQueue(graph.notes, suggestions, dismissed))
+    setTriageRows(triageQueue(scoped.notes, suggestions, dismissed))
     setOverlay('triage')
   }
   const acceptFromTriage = async (s) => {
@@ -591,6 +650,8 @@ export default function App() {
     { label: 'View: Core of Everything', hint: 'lens', run: () => { changeMode('brain'); changeView('core') } },
     { label: 'View: Second Brain Globe', hint: 'lens', run: () => { changeMode('brain'); changeView('globe') } },
     { label: 'View: Constellation', hint: 'lens', run: () => { changeMode('brain'); changeView('constellation') } },
+    ...(activeWs ? [{ label: 'Workspace: ALL VAULT', hint: 'scope', run: () => setWorkspaceId(null) }] : []),
+    ...workspaces.filter((w) => w.id !== workspaceId).slice(0, 8).map((w) => ({ label: 'Workspace: ' + w.name, hint: 'scope', run: () => setWorkspaceId(w.id) })),
     { label: 'Mode: Notes', hint: 'Ctrl+2', run: () => changeMode('notes') },
     { label: 'Mode: Dashboard', hint: 'Ctrl+3', run: () => changeMode('dashboard') },
     { label: 'Mode: Skills', hint: 'Ctrl+4', run: () => changeMode('skills') },
@@ -620,7 +681,7 @@ export default function App() {
       <div className={`stage ${mode !== 'brain' ? 'dimmed' : ''}`}>
         <SpaceCanvas
           view={view}
-          graph={graph}
+          graph={scoped}
           activeIds={filtering ? activeIds : null}
           onSelect={selectNote}
           onHover={(h) => bus.emit('hover', h)}
@@ -634,6 +695,15 @@ export default function App() {
       <TopBar
         mode={mode}
         onMode={changeMode}
+        workspacePill={
+          <WorkspacePill
+            workspaces={workspaces}
+            activeId={workspaceId}
+            onPick={setWorkspaceId}
+            onNew={() => setWsModal('new')}
+            onEdit={(w) => setWsModal(w)}
+          />
+        }
         view={view}
         onView={changeView}
         onSearch={() => setOverlay('palette')}
@@ -641,10 +711,10 @@ export default function App() {
       />
       {mode === 'brain' && (
         <>
-          <FolderTabs graph={graph} filter={filter} onChange={setFilter} />
+          <FolderTabs graph={scoped} filter={filter} onChange={setFilter} />
           <div className="hud-body">
             <HudSidebar
-              graph={graph}
+              graph={scoped}
               stats={stats}
               filter={filter}
               onFilter={setFilter}
@@ -662,7 +732,7 @@ export default function App() {
             />
             <div className="hud-spacer" />
             <Cockpit
-              graph={graph}
+              graph={scoped}
               clusters={clusters}
               onSelect={openNote}
               onUsage={(n) => window.onyx.bumpUsage?.(n).then(setUsage)}
@@ -675,12 +745,12 @@ export default function App() {
               onReset={() => setResetNonce((n) => n + 1)}
             />
           </div>
-          <HoverLayer graph={graph} />
+          <HoverLayer graph={scoped} />
         </>
       )}
       {mode === 'notes' && (
         <NotesMode
-          graph={graph}
+          graph={scoped}
           selected={selected}
           pins={pins}
           dailyFolder={cfg?.dailyFolder || '06 - Daily Logs'}
@@ -708,7 +778,8 @@ export default function App() {
       )}
       {mode === 'dashboard' && (
         <DashboardMode
-          graph={graph}
+          graph={scoped}
+          fullGraph={graph}
           clusters={clusters}
           usage={usage}
           onSelect={openNote}
@@ -733,7 +804,7 @@ export default function App() {
         <SkillsMode evaluated={evaluated} quests={quests} usage={usage} onReroll={rerollDaily} notes={graph?.notes || []} />
       )}
       {overlay === 'palette' && (
-        <CommandPalette graph={graph} actions={actions} onSelectNote={openNote} onClose={() => setOverlay(null)} />
+        <CommandPalette graph={scoped} actions={actions} onSelectNote={openNote} onClose={() => setOverlay(null)} />
       )}
       {overlay === 'capture' && (
         <QuickCapture
@@ -745,8 +816,17 @@ export default function App() {
       {overlay === 'review' && reviewQueue.length > 0 && (
         <ReviewModal due={reviewQueue} onGrade={handleGrade} onClose={() => setOverlay(null)} />
       )}
+      {wsModal && graph && (
+        <WorkspaceModal
+          graph={graph}
+          initial={wsModal === 'new' ? null : wsModal}
+          onSave={saveWorkspace}
+          onDelete={deleteWorkspace}
+          onClose={() => setWsModal(null)}
+        />
+      )}
       {overlay === 'findreplace' && graph && (
-        <FindReplaceModal graph={graph} onClose={() => setOverlay(null)} />
+        <FindReplaceModal graph={scoped} onClose={() => setOverlay(null)} />
       )}
       {overlay === 'triage' && triageRows.length > 0 && (
         <TriageModal
@@ -791,7 +871,7 @@ export default function App() {
         />
       )}
       <StatusBar
-        graph={graph}
+        graph={scoped}
         clusterCount={clusters.clusterCount}
         vaultPath={cfg?.vaultPath || ''}
         onPickVault={() => window.onyx.pickVault().then(setGraph)}

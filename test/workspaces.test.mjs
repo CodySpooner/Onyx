@@ -67,3 +67,20 @@ test('validateWorkspaceUi: dead active id resets; manual sanitized + capped', ()
   const dead = validateWorkspaceUi({ activeId: 'auto:GONE.md', manual: [] }, auto)
   assert.equal(dead.activeId, null)
 })
+
+test('W1 gap-close: manual union includes noteIds; buildWorkspaces; pickColor stable', async () => {
+  const { buildWorkspaces, pickColor } = await import('../src/renderer/lib/workspaces.mjs')
+  const g = G()
+  const manual = [{ id: 'm1', name: 'M', folders: [], tags: [], noteIds: ['c.md'] }]
+  assert.ok(noteInWorkspace(manual[0], g.notes[4])) // c.md via hand-picked id
+  const all = buildWorkspaces(g, manual)
+  assert.equal(all.length, 2)
+  assert.ok(all[0].auto && all[1].id === 'm1')
+  assert.equal(pickColor('Onyx'), pickColor('Onyx'))
+  const s = scopeGraph(g, all[0])
+  assert.equal(s.meta.scope, 'Onyx')
+  assert.equal(s.habitEntries.length, 0) // identity pass-through, no throw
+  // empty manual workspace scopes to zero notes without throwing
+  const empty = scopeGraph(g, { id: 'e', name: 'E', folders: [], tags: [], noteIds: [] })
+  assert.equal(empty.notes.length, 0)
+})

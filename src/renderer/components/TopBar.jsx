@@ -8,7 +8,7 @@ const MODES = [
   { id: 'skills', label: 'SKILLS' }
 ]
 
-export function TopBar({ mode, onMode, view, onView, onSearch, skillTab }) {
+export function TopBar({ mode, onMode, view, onView, onSearch, skillTab, workspacePill = null }) {
   return (
     <header className="topbar">
       <span className="brand">◑ ONYX</span>
@@ -34,6 +34,7 @@ export function TopBar({ mode, onMode, view, onView, onSearch, skillTab }) {
         ))}
       </nav>
       <div className="spacer" />
+      {workspacePill}
       <button className="searchbtn" onClick={onSearch}>
         <span className="searchbtn-glyph">⌕</span> SEARCH <Kbd>Ctrl K</Kbd>
       </button>
