@@ -5,6 +5,7 @@ import matter from 'gray-matter'
 import { parseTasks } from '../renderer/lib/tasks.mjs'
 import { parseCards } from '../renderer/lib/srs.mjs'
 import { parseHabitLines, dailyDateFromId } from '../renderer/lib/habits.mjs'
+import { buildSuggestions } from '../renderer/lib/suggest.mjs'
 
 const SAFE = /[\\/:*?"<>|#^[\]]/g
 function insideVault(vaultPath, abs) {
@@ -114,11 +115,20 @@ export async function scanVault(vaultPath) {
     }
   }
 
+  // suggestions need _content (still attached here) and the link lists (just built)
+  let suggestions = []
+  try {
+    suggestions = buildSuggestions(notes)
+  } catch {
+    /* suggestions are a bonus — never fail the scan for them */
+  }
+
   const publicNotes = notes.map(({ _content, ...n }) => n)
   return {
     folders: [...folders.values()],
     cards,
     habitEntries,
+    suggestions,
     notes: publicNotes,
     links,
     meta: {

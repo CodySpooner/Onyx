@@ -55,7 +55,7 @@ function BarRow({ color, label, value, max, onClick }) {
   )
 }
 
-export function DashboardMode({ graph, clusters, usage, onSelect, onFilter }) {
+export function DashboardMode({ graph, clusters, usage, onSelect, onFilter, suggestions = [], onAcceptSuggestion, onDismissSuggestion }) {
   const [snaps, setSnaps] = useState([])
   useEffect(() => {
     window.onyx.getSnapshots?.().then((d) => setSnaps(d || []))
@@ -264,6 +264,29 @@ export function DashboardMode({ graph, clusters, usage, onSelect, onFilter }) {
         {(graph.habitEntries?.length || 0) > 0 && (
           <section className="dpanel brk panel-in span4" style={{ '--i': 13 }}>
             <HabitGrid graph={graph} />
+          </section>
+        )}
+
+        {suggestions.length > 0 && (
+          <section className="dpanel brk panel-in span4" style={{ '--i': 14 }}>
+            <div className="u-label" data-tip="Notes that share rare vocabulary but aren't linked yet">
+              SYNAPSE SUGGESTIONS · {suggestions.length}
+            </div>
+            <div className="rule-ticks" />
+            {suggestions.slice(0, 8).map((s) => {
+              const ta = graph.notes.find((n) => n.id === s.a)?.title || s.a
+              const tb = graph.notes.find((n) => n.id === s.b)?.title || s.b
+              return (
+                <div key={s.a + s.b} className="sg-row">
+                  <button className="bl-title" onClick={() => onAcceptSuggestion?.(s)} title="Insert wikilink (undoable)">
+                    ⧉ {ta} ↔ {tb}
+                  </button>
+                  <button className="sg-x" onClick={() => onDismissSuggestion?.(s)} title="Dismiss">
+                    ×
+                  </button>
+                </div>
+              )
+            })}
           </section>
         )}
       </div>

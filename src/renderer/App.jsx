@@ -24,6 +24,11 @@ import { dailyId, dailyTemplate, appendCapture } from './lib/daily.mjs'
 import { findTemplateFolder, applyTemplate } from './lib/templates.mjs'
 import { dueCards, grade, prune } from './lib/srs.mjs'
 import { ReviewModal } from './components/ReviewModal.jsx'
+import { pushTrail, pruneTrail, trailBack } from './lib/trail.mjs'
+import { insertWikilink } from './lib/suggest.mjs'
+import { TrailStrip } from './components/TrailStrip.jsx'
+
+const skey = (s) => (s.a < s.b ? s.a + '|' + s.b : s.b + '|' + s.a)
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -48,6 +53,10 @@ export default function App() {
   const [srsLoaded, setSrsLoaded] = useState(false)
   const srsStamped = useRef(false)
   const [reviewQueue, setReviewQueue] = useState([])
+  const [trail, setTrail] = useState([])
+  const trailLoaded = useRef(false)
+  const resumeShown = useRef(false)
+  const [dismissed, setDismissed] = useState(() => new Set())
   const lastOpened = useRef(null)
   const announced = useRef(new Set()) // unlock toasts already shown this session
 
@@ -76,7 +85,40 @@ export default function App() {
       setSrs(s?.states || {}) // unpruned — liveness in the vault decides below
       setSrsLoaded(true)
     })
+    window.onyx.storeGet?.('trail').then((t) => {
+      if (Array.isArray(t?.entries)) setTrail(t.entries)
+      trailLoaded.current = true
+    })
+    window.onyx.storeGet?.('suggestDismissed').then((d) => {
+      if (Array.isArray(d?.keys)) setDismissed(new Set(d.keys))
+    })
   }, [])
+
+  // trail persistence + pruning against live notes
+  useEffect(() => {
+    if (trailLoaded.current) window.onyx.storeSet?.('trail', { entries: trail })
+  }, [trail])
+  useEffect(() => {
+    if (!graph) return
+    const live = new Set(graph.notes.map((n) => n.id))
+    setTrail((t) => {
+      const next = pruneTrail(t, live)
+      return next.length === t.length ? t : next
+    })
+  }, [graph])
+
+  // one-shot "resume last session" toast
+  useEffect(() => {
+    if (!graph || !trailLoaded.current || resumeShown.current || !trail.length || selected) return
+    resumeShown.current = true
+    const last = trail[trail.length - 1]
+    const title = graph.notes.find((n) => n.id === last.id)?.title
+    if (!title) return
+    bus.emit('toast', {
+      msg: `◆ last session: ${trail.length} notes`,
+      action: { label: 'RESUME', run: () => kbRef.current.openNote?.(last.id) }
+    })
+  }, [graph, trail])
 
   // once per session, after BOTH store and graph arrive: stamp lastSeen for
   // cards still in the vault, THEN prune — so a 60d+ gap between launches
@@ -151,7 +193,7 @@ export default function App() {
   // keyboard contract — one listener; handler reads fresh state via ref
   // (merge-assign: callbacks like openDaily and the dirty flag must survive renders)
   const kbRef = useRef({})
-  Object.assign(kbRef.current, { overlay, selected, mode, focusMode })
+  Object.assign(kbRef.current, { overlay, selected, mode, focusMode, trail })
   useEffect(() => {
     const onKey = (e) => {
       const k = kbRef.current
@@ -181,6 +223,14 @@ export default function App() {
         setFocusMode((f) => !f)
         return
       }
+      if (e.altKey && e.key === 'ArrowLeft' && !inInput) {
+        const back = trailBack(k.trail)
+        if (back) {
+          e.preventDefault()
+          kbRef.current.openNote?.(back)
+        }
+        return
+      }
       if (e.key === 'Escape' && !inInput) {
         if (k.overlay) setOverlay(null)
         else if (k.focusMode) setFocusMode(false)
@@ -203,6 +253,7 @@ export default function App() {
     if (!guardDirty()) return
     if (id == null) setFocusMode(false) // closing the reader always exits focus
     setSelected(id)
+    if (id) setTrail((t) => pushTrail(t, id, Date.now()))
   }
 
   const toggleLinks = () => {
@@ -233,11 +284,13 @@ export default function App() {
     if (!guardDirty()) return
     setSelected(id)
     setFlyTo((f) => ({ id, nonce: (f?.nonce || 0) + 1 }))
+    if (id) setTrail((t) => pushTrail(t, id, Date.now()))
     if (id && lastOpened.current !== id) {
       lastOpened.current = id
       window.onyx.bumpUsage?.('noteOpen').then(setUsage)
     }
   }
+  kbRef.current.openNote = openNote
   const openDaily = async () => {
     const folder = cfg?.dailyFolder || '06 - Daily Logs'
     const now = new Date()
@@ -288,6 +341,55 @@ export default function App() {
   }
   const templateFolder = graph ? findTemplateFolder(graph.folders) : null
   const templates = templateFolder ? graph.notes.filter((n) => n.folder === templateFolder) : []
+
+  // Synapse Suggestions: engine runs in the indexer; renderer filters dismissals
+  const suggestions = useMemo(
+    () => (graph?.suggestions || []).filter((s) => !dismissed.has(skey(s))),
+    [graph, dismissed]
+  )
+  const titleOf = (id) => graph?.notes.find((n) => n.id === id)?.title || id
+  const dismissSuggestion = (s) => {
+    setDismissed((prev) => {
+      const next = new Set(prev)
+      next.add(skey(s))
+      window.onyx.storeSet?.('suggestDismissed', { keys: [...next] })
+      return next
+    })
+  }
+  const acceptSuggestion = async (s) => {
+    const src = s.mention?.in || s.a
+    const dst = src === s.a ? s.b : s.a
+    // read-modify-write with the capture-abort pattern: a null read is a lock,
+    // never a license to guess
+    const raw = await window.onyx.readNote(src)
+    if (raw == null) {
+      bus.emit('toast', { msg: '✕ could not read note — link aborted', kind: 'err' })
+      return
+    }
+    const next = insertWikilink(raw, titleOf(dst), s.mention)
+    if (next === raw) {
+      dismissSuggestion(s) // already linked by hand — retire the suggestion
+      return
+    }
+    const ok = await window.onyx.writeNote(src, next)
+    if (!ok) {
+      bus.emit('toast', { msg: '✕ could not write note', kind: 'err' })
+      return
+    }
+    dismissSuggestion(s)
+    window.onyx.bumpUsage?.('linkAccept').then(setUsage)
+    bus.emit('toast', {
+      msg: `◆ linked ${titleOf(src)} → ${titleOf(dst)}`,
+      kind: 'skill',
+      action: {
+        label: 'UNDO',
+        run: async () => {
+          await window.onyx.writeNote(src, raw) // whole-file restore — trivially correct
+          bus.emit('toast', { msg: '↩ link undone' })
+        }
+      }
+    })
+  }
 
   const due = graph?.cards ? dueCards(graph.cards, srs, Date.now()) : []
   // freeze the deck at open time — live `due` shrinks with every grade,
@@ -431,6 +533,9 @@ export default function App() {
             setFilter(f)
             setMode('brain')
           }}
+          suggestions={suggestions}
+          onAcceptSuggestion={acceptSuggestion}
+          onDismissSuggestion={dismissSuggestion}
         />
       )}
       {mode === 'skills' && evaluated && <SkillsMode evaluated={evaluated} />}
@@ -451,6 +556,10 @@ export default function App() {
         <NoteReader
           id={selected}
           graph={graph}
+          clusters={clusters}
+          suggestions={suggestions}
+          onAcceptSuggestion={acceptSuggestion}
+          onDismissSuggestion={dismissSuggestion}
           onSelect={openNote}
           onClose={() => selectNote(null)}
           pinned={pins.includes(selected)}
@@ -460,6 +569,16 @@ export default function App() {
           onEditingChange={(d) => {
             kbRef.current.dirty = d
           }}
+        />
+      )}
+      {mode === 'brain' && !focusMode && trail.length > 1 && (
+        <TrailStrip
+          trail={trail}
+          graph={graph}
+          clusters={clusters}
+          current={selected}
+          onOpen={openNote}
+          onClear={() => setTrail([])}
         />
       )}
       <StatusBar

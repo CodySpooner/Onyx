@@ -1,6 +1,91 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import MarkdownIt from 'markdown-it'
 import { extractLinkContext } from '../lib/backlinks.mjs'
+import { neighborhood, radialLayout } from '../lib/neighborhood.mjs'
+import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
+
+// 1-hop local graph, SVG, rendered once per note — link-walking without
+// touching the 3D scene.
+function Minimap({ note, graph, clusters, onSelect }) {
+  const data = useMemo(() => {
+    if (!note) return null
+    const nb = neighborhood(graph, note.id)
+    if (!nb.inbound.length && !nb.outbound.length && !nb.mutual.length) return { empty: true }
+    const degOf = new Map(graph.notes.map((n) => [n.id, n.inLinks.length + n.outLinks.length]))
+    return { nb, layout: radialLayout(nb, 236, 190, degOf) }
+  }, [note?.id, graph])
+
+  if (!data) return null
+  const colorOf = (id) => {
+    const ci = clusters?.clusterOf?.get(id)
+    return ci >= 0 ? CLUSTER_PALETTE[ci % CLUSTER_PALETTE.length] : '#4a5470'
+  }
+  const titleOf = (id) => graph.notes.find((n) => n.id === id)?.title || id
+  const short = (id) => {
+    const t = titleOf(id)
+    return t.length > 13 ? t.slice(0, 12) + '…' : t
+  }
+
+  return (
+    <div className="minimap">
+      <div className="u-label">
+        NEIGHBORHOOD{data.empty ? '' : ` · ${data.nb.inbound.length + data.nb.mutual.length} IN / ${data.nb.outbound.length + data.nb.mutual.length} OUT`}
+      </div>
+      <div className="rule-ticks" />
+      {data.empty ? (
+        <div className="mm-empty">no connections — try Suggested Links</div>
+      ) : (
+        <svg viewBox="0 0 236 190" className="mm-svg">
+          {data.layout.nodes.map((p) => (
+            <line key={'l' + p.id} x1={data.layout.center.x} y1={data.layout.center.y} x2={p.x} y2={p.y} className="mm-edge" />
+          ))}
+          {data.layout.nodes.map((p) => (
+            <g key={p.id} className="mm-node" onClick={() => onSelect(p.id)}>
+              <circle cx={p.x} cy={p.y} r="5" fill={colorOf(p.id)} />
+              <text x={p.x + (p.side === 'in' ? -8 : 8)} y={p.y + 3} textAnchor={p.side === 'in' ? 'end' : 'start'}>
+                {short(p.id)}
+              </text>
+              <title>{titleOf(p.id)}</title>
+            </g>
+          ))}
+          <circle cx={data.layout.center.x} cy={data.layout.center.y} r="7" className="mm-center" />
+          {(data.layout.more.in > 0 || data.layout.more.out > 0) && (
+            <text x="118" y="184" textAnchor="middle" className="mm-more">
+              +{data.layout.more.in + data.layout.more.out + data.layout.more.mutual} more
+            </text>
+          )}
+        </svg>
+      )}
+    </div>
+  )
+}
+
+function SuggestedLinks({ note, graph, suggestions, onAccept, onDismiss }) {
+  if (!note) return null
+  const mine = suggestions.filter((s) => s.a === note.id || s.b === note.id).slice(0, 5)
+  if (!mine.length) return null
+  const titleOf = (id) => graph.notes.find((n) => n.id === id)?.title || id
+  return (
+    <div className="suggests">
+      <div className="u-label">SUGGESTED LINKS · {mine.length}</div>
+      <div className="rule-ticks" />
+      {mine.map((s) => {
+        const other = s.a === note.id ? s.b : s.a
+        return (
+          <div key={s.a + s.b} className="sg-row">
+            <button className="bl-title" onClick={() => onAccept(s)} title="Insert wikilink (undoable)">
+              ⧉ {titleOf(other)}
+            </button>
+            <span className="sg-terms">{s.terms.slice(0, 3).map((t) => '#' + t).join(' ')}</span>
+            <button className="sg-x" onClick={() => onDismiss(s)} title="Dismiss suggestion">
+              ×
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 // per-session backlink snippet cache, invalidated by source-note mtime
 const blCache = new Map() // linkingNoteId -> { mtime, snips }
@@ -77,7 +162,7 @@ function renderBody(raw, basenameToId) {
   return md.render(withLinks)
 }
 
-export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage, onEditingChange }) {
+export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSuggestion, onDismissSuggestion, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage, onEditingChange }) {
   const [raw, setRaw] = useState(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -261,7 +346,13 @@ export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTog
       ) : (
         <div className="reader-body" ref={ref} dangerouslySetInnerHTML={{ __html: renderBody(raw, basenameToId) }} />
       )}
-      {!editing && raw != null && <Backlinks note={note} graph={graph} onSelect={onSelect} />}
+      {!editing && raw != null && (
+        <>
+          <Minimap note={note} graph={graph} clusters={clusters} onSelect={onSelect} />
+          <SuggestedLinks note={note} graph={graph} suggestions={suggestions} onAccept={onAcceptSuggestion} onDismiss={onDismissSuggestion} />
+          <Backlinks note={note} graph={graph} onSelect={onSelect} />
+        </>
+      )}
     </aside>
   )
 }
