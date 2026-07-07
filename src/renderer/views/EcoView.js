@@ -661,10 +661,15 @@ export class EcoView {
   }
 
   _flyToDistrict(d) {
+    // hover above the district looking down its doorstep — street level puts
+    // the camera inside neighboring facades
+    const len = Math.hypot(d.cx, d.cz) || 1
+    const ox = (d.cx / len) * (d.S * 4 + 26)
+    const oz = (d.cz / len) * (d.S * 4 + 26)
     this._flight = {
       from: this.camera.position.clone(),
-      to: new THREE.Vector3(d.door.x, 4 + 2.2 * d.S, d.door.z + 3 * d.S),
-      look: new THREE.Vector3(d.cx, d.S, d.cz),
+      to: new THREE.Vector3(d.cx + ox, (d.topH || d.S * 2) * 1.6 + 26, d.cz + oz),
+      look: new THREE.Vector3(d.cx, (d.topH || d.S * 2) * 0.4, d.cz),
       t: 0
     }
   }
