@@ -40,12 +40,16 @@ test('effective: reduced motion masters speed/spin/spawn/grain/pulses', () => {
   assert.equal(e['look.grain'], 0)
 })
 
-test('needsRebuild: live-in-* never rebuilds; lens-scoped live only in that lens; [] always rebuilds', () => {
+test('needsRebuild: live-* never rebuilds; lens-live skips; rebuildIn routes to consumers only', () => {
   const a = { ...DEFAULTS }
   assert.equal(needsRebuild(a, { ...a, 'look.bloom': 1 }, 'stacks'), false) // '*'
   assert.equal(needsRebuild(a, { ...a, 'look.nodeSize': 2 }, 'brain'), false) // live in brain
-  assert.equal(needsRebuild(a, { ...a, 'look.nodeSize': 2 }, 'nexus'), true) // rebuild elsewhere
-  assert.equal(needsRebuild(a, { ...a, 'theme.preset': 'ember' }, 'brain'), true) // [] always
+  assert.equal(needsRebuild(a, { ...a, 'look.nodeSize': 2 }, 'nexus'), false) // no other lens consumes it
+  assert.equal(needsRebuild(a, { ...a, 'theme.preset': 'ember' }, 'brain'), true) // preset consumer
+  assert.equal(needsRebuild(a, { ...a, 'theme.preset': 'ember' }, 'atlas'), true) // preset consumer
+  assert.equal(needsRebuild(a, { ...a, 'theme.preset': 'ember' }, 'stacks'), false) // non-consumer skips the rebuild
+  assert.equal(needsRebuild(a, { ...a, 'look.gemShape': 'octa' }, 'eco'), false) // brain-only build key
+  assert.equal(needsRebuild(a, { ...a, 'physics.repulsion': 2000 }, 'brain'), false) // physics now live
   assert.equal(needsRebuild(null, a, 'brain'), false) // first load never bumps
 })
 

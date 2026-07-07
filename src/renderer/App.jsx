@@ -71,11 +71,12 @@ export default function App() {
   const [gset, setGset] = useState(null) // null until loaded — views fall back to defaults
   const [showCustomize, setShowCustomize] = useState(false)
   const gsetTimer = useRef(null)
+  const gsetPendingWrite = useRef(null)
   const [wsManual, setWsManual] = useState([])
   const [workspaceId, setWorkspaceId] = useState(null)
   const [wsModal, setWsModal] = useState(null) // null | 'new' | workspace object
   const wsLoaded = useRef(false)
-  const wsPending = useRef(null)
+  const [wsStore, setWsStore] = useState(null) // persisted workspace state, once loaded
   const [quests, setQuests] = useState(null)
   const [questsLoaded, setQuestsLoaded] = useState(false)
   const lastOpened = useRef(null)
@@ -113,9 +114,15 @@ export default function App() {
     window.onyx.storeGet?.('suggest-dismissed').then((d) => {
       if (Array.isArray(d?.keys)) setDismissed(new Set(d.keys))
     })
-    window.onyx.storeGet?.('graph-custom').then((s0) => setGset(validateSettings(s0)))
+    window.onyx.storeGet?.('graph-custom').then((s0) => {
+      const v = validateSettings(s0)
+      setGset(v)
+      // the first view builds before this resolves — if the stored settings
+      // include build-time keys (theme, gem shape...), rebuild it once
+      if (needsRebuild(GSET_DEFAULTS, v, 'brain')) setResetNonce((n) => n + 1)
+    })
     Promise.all([window.onyx.storeGet?.('workspaces'), window.onyx.storeGet?.('workspace-ui')]).then(([w, ui]) => {
-      wsPending.current = { manual: w?.manual, activeId: ui?.activeId }
+      setWsStore({ manual: w?.manual, activeId: ui?.activeId })
     })
     window.onyx.storeGet?.('quests').then((qs) => {
       setQuests(qs || null)
@@ -219,19 +226,27 @@ export default function App() {
   const activeWs = workspaces.find((w) => w.id === workspaceId) || null
   const scoped = useMemo(() => (graph && activeWs ? scopeGraph(graph, activeWs) : graph), [graph, activeWs])
 
-  // validate persisted workspace state once the graph exists
+  // validate persisted workspace state once the graph exists. wsStore is
+  // state (not a ref) so whichever of graph/store loads last re-runs this —
+  // a ref here silently skipped restore AND disabled persistence for the
+  // whole session when the graph won the boot race
   useEffect(() => {
-    if (!graph || wsLoaded.current || !wsPending.current) return
+    if (!graph || wsLoaded.current || !wsStore) return
     wsLoaded.current = true
     const auto = buildWorkspaces(graph, [])
-    const ok = validateWorkspaceUi({ activeId: wsPending.current.activeId, manual: wsPending.current.manual }, auto)
+    const ok = validateWorkspaceUi({ activeId: wsStore.activeId, manual: wsStore.manual }, auto)
     setWsManual(ok.manual)
     // manual ids validate against the loaded manual list too
     const all = new Set([...auto.map((w) => w.id), ...ok.manual.map((w) => w.id)])
-    if (ok.activeId || (wsPending.current.activeId && all.has(wsPending.current.activeId))) {
-      setWorkspaceId(wsPending.current.activeId)
+    if (ok.activeId || (wsStore.activeId && all.has(wsStore.activeId))) {
+      setWorkspaceId(wsStore.activeId)
     }
-  }, [graph])
+  }, [graph, wsStore])
+  // a new slate means a clean slate: folder/tag filters from the previous
+  // scope rarely exist in the next one and would dim everything chip-lessly
+  useEffect(() => {
+    setFilter(EMPTY_FILTER)
+  }, [workspaceId])
   // deleted project log → its auto workspace evaporates: fall back loudly
   useEffect(() => {
     if (!graph || !wsLoaded.current || !workspaceId) return
@@ -251,15 +266,33 @@ export default function App() {
       const next = validateSettings({ ...(prev || GSET_DEFAULTS), ...patch })
       if (needsRebuild(prev, next, view)) setResetNonce((n) => n + 1)
       clearTimeout(gsetTimer.current)
-      gsetTimer.current = setTimeout(() => window.onyx.storeSet?.('graph-custom', next), 400)
+      gsetPendingWrite.current = next
+      gsetTimer.current = setTimeout(() => {
+        gsetPendingWrite.current = null
+        window.onyx.storeSet?.('graph-custom', next)
+      }, 400)
       return next
     })
   }
+  // flush a pending debounced settings write if the window closes inside 400ms
+  useEffect(() => {
+    const flush = () => {
+      if (gsetPendingWrite.current) window.onyx.storeSet?.('graph-custom', gsetPendingWrite.current)
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => window.removeEventListener('beforeunload', flush)
+  }, [])
   const saveWorkspace = (w) => {
+    // enforce the cap BEFORE activating — silently dropping the entry while
+    // activating its id used to fire a bogus "no longer exists" toast
+    const isNew = !wsManual.some((x) => x.id === w.id)
+    if (isNew && wsManual.length >= 20) {
+      bus.emit('toast', { msg: '◈ workspace limit reached (20) — delete one first', kind: 'err' })
+      return
+    }
     setWsManual((prev) => {
       const at = prev.findIndex((x) => x.id === w.id)
-      const next = at >= 0 ? prev.map((x) => (x.id === w.id ? w : x)) : [...prev, w]
-      return next.slice(0, 20)
+      return at >= 0 ? prev.map((x) => (x.id === w.id ? w : x)) : [...prev, w]
     })
     setWsModal(null)
     setWorkspaceId(w.id)
@@ -277,6 +310,13 @@ export default function App() {
     () => (scoped ? detectClusters(scoped.notes.map((n) => n.id), scoped.links) : { clusterCount: 0, clusterOf: new Map() }),
     [scoped]
   )
+  // full-graph consumers (NoteReader minimap, TrailStrip) need cluster colors
+  // for out-of-scope notes too — scoped clusters would miss them
+  const fullClusters = useMemo(() => {
+    if (!graph) return { clusterCount: 0, clusterOf: new Map() }
+    if (scoped === graph) return clusters
+    return detectClusters(graph.notes.map((n) => n.id), graph.links)
+  }, [graph, scoped, clusters])
   // expensive graph-only half memoized on [graph]; cheap usage merge per bump
   const graphSkillStats = useMemo(() => (graph ? buildGraphSkillStats(graph, Date.now()) : null), [graph])
   const evaluated = useMemo(
@@ -767,7 +807,9 @@ export default function App() {
               onTune={() => setShowCustomize((v) => !v)}
               tuneOn={showCustomize}
             />
-            {showCustomize && (
+            {showCustomize && gset && (
+              // gated on gset: interacting before the store loads would
+              // persist DEFAULTS over the user's saved settings
               <CustomizeDrawer gset={gset} view={view} onChange={updateGset} onClose={() => setShowCustomize(false)} />
             )}
           </div>
@@ -789,7 +831,7 @@ export default function App() {
           onFlyTo={flyToBrain}
           readerProps={{
             graph,
-            clusters,
+            clusters: fullClusters,
             suggestions,
             onAcceptSuggestion: acceptSuggestion,
             onDismissSuggestion: dismissSuggestion,
@@ -852,7 +894,9 @@ export default function App() {
         />
       )}
       {overlay === 'findreplace' && graph && (
-        <FindReplaceModal graph={scoped} onClose={() => setOverlay(null)} />
+        // full graph on purpose — the modal promises WHOLE VAULT; a scoped
+        // scan would silently skip out-of-workspace notes mid-rename
+        <FindReplaceModal graph={graph} onClose={() => setOverlay(null)} />
       )}
       {overlay === 'triage' && triageRows.length > 0 && (
         <TriageModal
@@ -871,7 +915,7 @@ export default function App() {
           id={selected}
           onFullscreen={() => setFocusMode((f) => !f)}
           graph={graph}
-          clusters={clusters}
+          clusters={fullClusters}
           suggestions={suggestions}
           onAcceptSuggestion={acceptSuggestion}
           onDismissSuggestion={dismissSuggestion}
@@ -890,7 +934,7 @@ export default function App() {
         <TrailStrip
           trail={trail}
           graph={graph}
-          clusters={clusters}
+          clusters={fullClusters}
           current={selected}
           onOpen={openNote}
           onClear={() => setTrail([])}

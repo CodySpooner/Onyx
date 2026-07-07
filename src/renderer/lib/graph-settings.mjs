@@ -1,11 +1,13 @@
 // The customization studio's brain: a typed settings schema, theme presets,
 // validation, and the live-vs-rebuild routing table. Pure, zero imports.
 
-// liveIn: '*' = live-applies in every lens · [ids] = live there, rebuild
-// elsewhere · [] = always needs a view rebuild
+// liveIn: '*' = live-applies in every lens · [ids] = live there · [] = never
+// live. rebuildIn (optional): the only lenses that consume the key at build
+// time — a change rebuilds those and is a no-op elsewhere. Without rebuildIn,
+// any non-live change rebuilds the current lens (conservative default).
 export const SCHEMA = [
-  { key: 'theme.preset', section: 'theme', label: 'THEME', type: 'enum', options: ['onyx', 'ember', 'ice', 'synthwave', 'mono'], def: 'onyx', liveIn: [] },
-  { key: 'theme.folderColors', section: 'theme', label: 'COLOR BY FOLDER', type: 'bool', def: false, liveIn: [] },
+  { key: 'theme.preset', section: 'theme', label: 'THEME', type: 'enum', options: ['onyx', 'ember', 'ice', 'synthwave', 'mono'], def: 'onyx', liveIn: [], rebuildIn: ['brain', 'atlas', 'nexus'] },
+  { key: 'theme.folderColors', section: 'theme', label: 'COLOR BY FOLDER', type: 'bool', def: false, liveIn: [], rebuildIn: ['brain'] },
   { key: 'theme.nebulaDim', section: 'theme', label: 'BACKDROP', type: 'range', min: 0.2, max: 1.5, step: 0.05, def: 1, liveIn: '*' },
 
   { key: 'look.bloom', section: 'look', label: 'BLOOM', type: 'range', min: 0, max: 1.5, step: 0.05, def: 0.65, liveIn: '*' },
@@ -14,22 +16,22 @@ export const SCHEMA = [
   { key: 'look.grain', section: 'look', label: 'FILM GRAIN', type: 'range', min: 0, max: 0.05, step: 0.002, def: 0.012, liveIn: '*' },
   { key: 'look.vignette', section: 'look', label: 'VIGNETTE', type: 'range', min: 0, max: 0.6, step: 0.02, def: 0.28, liveIn: '*' },
   { key: 'look.chroma', section: 'look', label: 'CHROMA FRINGE', type: 'range', min: 0, max: 0.003, step: 0.0001, def: 0.0009, liveIn: '*' },
-  { key: 'look.nodeSize', section: 'look', label: 'NODE SIZE', type: 'range', min: 0.5, max: 2, step: 0.05, def: 1, liveIn: ['brain'] },
+  { key: 'look.nodeSize', section: 'look', label: 'NODE SIZE', type: 'range', min: 0.5, max: 2, step: 0.05, def: 1, liveIn: ['brain'], rebuildIn: [] },
   { key: 'look.linkOpacity', section: 'look', label: 'LINK OPACITY', type: 'range', min: 0, max: 0.5, step: 0.02, def: 0.1, liveIn: '*' },
-  { key: 'look.labelSize', section: 'look', label: 'LABEL SIZE', type: 'range', min: 0.5, max: 2, step: 0.05, def: 1, liveIn: ['brain'] },
-  { key: 'look.labelFade', section: 'look', label: 'LABEL REACH', type: 'range', min: 0.4, max: 2, step: 0.1, def: 1, liveIn: ['brain'] },
-  { key: 'look.gemShape', section: 'look', label: 'GEM SHAPE', type: 'enum', options: ['auto', 'sphere', 'ico', 'octa', 'dodeca', 'tetra'], def: 'auto', liveIn: [] },
+  { key: 'look.labelSize', section: 'look', label: 'LABEL SIZE', type: 'range', min: 0.5, max: 2, step: 0.05, def: 1, liveIn: ['brain'], rebuildIn: [] },
+  { key: 'look.labelFade', section: 'look', label: 'LABEL REACH', type: 'range', min: 0.4, max: 2, step: 0.1, def: 1, liveIn: ['brain'], rebuildIn: [] },
+  { key: 'look.gemShape', section: 'look', label: 'GEM SHAPE', type: 'enum', options: ['auto', 'sphere', 'ico', 'octa', 'dodeca', 'tetra'], def: 'auto', liveIn: [], rebuildIn: ['brain'] },
 
   { key: 'motion.speed', section: 'motion', label: 'ANIMATION SPEED', type: 'range', min: 0, max: 2, step: 0.1, def: 1, liveIn: '*' },
-  { key: 'motion.pulses', section: 'motion', label: 'PULSE DENSITY', type: 'range', min: 0, max: 2, step: 0.25, def: 1, liveIn: [] },
-  { key: 'motion.spin', section: 'motion', label: 'GEM SPIN', type: 'bool', def: true, liveIn: ['brain'] },
-  { key: 'motion.spawn', section: 'motion', label: 'SPAWN CASCADE', type: 'bool', def: true, liveIn: [] },
+  { key: 'motion.pulses', section: 'motion', label: 'PULSE DENSITY', type: 'range', min: 0, max: 2, step: 0.25, def: 1, liveIn: [], rebuildIn: ['brain'] },
+  { key: 'motion.spin', section: 'motion', label: 'GEM SPIN', type: 'bool', def: true, liveIn: '*' },
+  { key: 'motion.spawn', section: 'motion', label: 'SPAWN CASCADE', type: 'bool', def: true, liveIn: [], rebuildIn: ['brain'] },
   { key: 'motion.reduced', section: 'motion', label: 'REDUCED MOTION', type: 'bool', def: false, liveIn: '*' },
 
-  { key: 'physics.repulsion', section: 'physics', label: 'REPULSION', type: 'range', min: 200, max: 2600, step: 50, def: 900, liveIn: ['brain'] },
-  { key: 'physics.linkLength', section: 'physics', label: 'LINK LENGTH', type: 'range', min: 10, max: 70, step: 1, def: 27, liveIn: ['brain'] },
-  { key: 'physics.spread', section: 'physics', label: 'SPREAD', type: 'range', min: 90, max: 260, step: 5, def: 165, liveIn: ['brain'] },
-  { key: 'physics.gravity', section: 'physics', label: 'CENTER PULL', type: 'range', min: 0.0005, max: 0.005, step: 0.0001, def: 0.0016, liveIn: ['brain'] }
+  { key: 'physics.repulsion', section: 'physics', label: 'REPULSION', type: 'range', min: 200, max: 2600, step: 50, def: 900, liveIn: ['brain'], rebuildIn: [] },
+  { key: 'physics.linkLength', section: 'physics', label: 'LINK LENGTH', type: 'range', min: 10, max: 70, step: 1, def: 27, liveIn: ['brain'], rebuildIn: [] },
+  { key: 'physics.spread', section: 'physics', label: 'SPREAD', type: 'range', min: 90, max: 260, step: 5, def: 165, liveIn: ['brain'], rebuildIn: [] },
+  { key: 'physics.gravity', section: 'physics', label: 'CENTER PULL', type: 'range', min: 0.0005, max: 0.005, step: 0.0001, def: 0.0016, liveIn: ['brain'], rebuildIn: [] }
 ]
 
 export const PRESETS = {
@@ -79,6 +81,7 @@ export function needsRebuild(prev, next, viewId) {
     if (val(prev, row.key) === val(next, row.key)) continue
     if (row.liveIn === '*') continue
     if (Array.isArray(row.liveIn) && row.liveIn.includes(viewId)) continue
+    if (row.rebuildIn !== undefined && !row.rebuildIn.includes(viewId)) continue // no lens consumes it here
     return true
   }
   return false

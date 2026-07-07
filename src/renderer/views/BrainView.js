@@ -104,25 +104,30 @@ export class BrainView {
     })
     this.sim.tick(300) // warm up before first paint
 
+    const theme = paletteFor(this.settings)
+    const byFolder = val(this.settings, 'theme.folderColors')
+    const gemShape = val(this.settings, 'look.gemShape')
+    const spawnOn = eff0['motion.spawn']
     graph.notes.forEach((note) => {
       const simNode = this.sim.byId.get(note.id)
       const ci = clusterOf.get(note.id)
-      const theme = paletteFor(this.settings)
-      const colorHex = val(this.settings, 'theme.folderColors')
+      const colorHex = byFolder
         ? theme.clusters[folderColorIndex(note.folder)]
         : ci >= 0
           ? theme.clusters[ci % theme.clusters.length]
           : theme.orphan
       const deg = note.outLinks.length + note.inLinks.length
       const size = clamp(0.55 + deg * 0.11, 0.55, 2.4)
-      const orb = makeOrb(colorHex, size, note.type, note.id, val(this.settings, 'look.gemShape'))
+      const orb = makeOrb(colorHex, size, note.type, note.id, gemShape)
       orb.mesh.position.set(simNode.x, simNode.y, simNode.z)
       this.group.add(orb.mesh)
-      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci, bornAt: !effective(this.settings)['motion.spawn'] || prevIds.has(note.id) ? this._t - 0.6 : this._t + newCount++ * 0.015 }
+      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci, bornAt: !spawnOn || prevIds.has(note.id) ? this._t - 0.6 : this._t + newCount++ * 0.015 }
       this.nodes.push(rec)
       this.byId.set(note.id, rec)
 
       const label = makeLabel(note.title, '#eef2ff', 0.032)
+      label.userData.baseW = label.scale.x
+      label.userData.baseH = label.scale.y
       this.group.add(label)
       this.labels.push({ sprite: label, id: note.id, rec })
     })
@@ -335,7 +340,8 @@ export class BrainView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    let dt = Math.min(0.05, this.clock.getDelta())
+    const rdt = Math.min(0.05, this.clock.getDelta()) // real time — FX that must finish
+    let dt = rdt
     if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
 
@@ -364,8 +370,10 @@ export class BrainView {
         n.mesh.rotation.y += n.spinY
       }
       const pulse = 1 + Math.sin(this._t * 1.5 + n.pulse) * 0.07
-      // staggered cascade-pop on (re)build — easeOutBack overshoot sells it
-      n.spawnK = clamp01((this._t - (n.bornAt ?? 0)) / 0.6)
+      // staggered cascade-pop on (re)build — easeOutBack overshoot sells it.
+      // speed 0 freezes _t, which would leave every orb at scale 0 forever —
+      // treat the cascade as done so the graph stays visible
+      n.spawnK = this.eff && this.eff['motion.speed'] === 0 ? 1 : clamp01((this._t - (n.bornAt ?? 0)) / 0.6)
       const spawn = easeOutBack(n.spawnK)
       n.mesh.scale.setScalar(Math.max(0.001, n.baseSize * (this.eff ? this.eff['look.nodeSize'] : 1) * pulse * (n.active ? 1 : 0.55) * spawn))
     }
@@ -395,6 +403,11 @@ export class BrainView {
         continue
       }
       l.sprite.position.set(l.rec.mesh.position.x, l.rec.mesh.position.y + l.rec.baseSize + 1.3, l.rec.mesh.position.z)
+      const ls = this.eff ? this.eff['look.labelSize'] : 1
+      if (l.sprite.userData.ls !== ls) {
+        l.sprite.userData.ls = ls
+        l.sprite.scale.set(l.sprite.userData.baseW * ls, l.sprite.userData.baseH * ls, 1)
+      }
       const d = tmp.copy(l.sprite.position).distanceTo(cam)
       const reach = this.eff ? this.eff['look.labelFade'] : 1
       let o = Math.min(0.95, 1 - (d - 230 * reach) / (230 * reach))
@@ -426,7 +439,7 @@ export class BrainView {
       }
     }
     if (this._ringFx) {
-      this._ringFx.t += dt * 2
+      this._ringFx.t += rdt * 2 // real time — must finish even at speed 0
       const rk = Math.min(1, this._ringFx.t)
       this._ringFx.sprite.scale.setScalar(2 + rk * 9)
       this._ringFx.sprite.material.opacity = 0.7 * (1 - rk)
@@ -486,6 +499,14 @@ export class BrainView {
   setSettings(s) {
     this.settings = s
     applyCommonSettings(this, s)
+    if (this.sim) {
+      // physics sliders steer the running sim — no rebuild
+      const e = this.eff
+      this.sim.o.repulsion = e['physics.repulsion']
+      this.sim.o.restLen = e['physics.linkLength']
+      this.sim.o.maxRadius = e['physics.spread']
+      this.sim.o.center = e['physics.gravity']
+    }
   }
 
   setPaused(p) {

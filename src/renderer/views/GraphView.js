@@ -184,7 +184,7 @@ export class GraphView {
     if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
     this.group.rotation.y += 0.0006
-    animateOrbs(this.nodes, this._t, dt)
+    animateOrbs(this.nodes, this._t, dt, !this.eff || this.eff['motion.spin'])
     this._fadeLabels()
     this.controls.update()
     if (this.grade) this.grade.uniforms.time.value = this._t

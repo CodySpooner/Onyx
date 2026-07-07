@@ -90,6 +90,7 @@ export function createSim(ids, links, opts = {}) {
   return {
     nodes,
     byId,
+    o, // live-tunable params — the customize studio writes these directly
     tick(k = 1) {
       for (let i = 0; i < k; i++) tickOnce()
     }

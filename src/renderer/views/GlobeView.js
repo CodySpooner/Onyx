@@ -230,7 +230,7 @@ export class GlobeView {
     if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
     this.group.rotation.y += 0.0011
-    animateOrbs(this.nodes, this._t, dt)
+    animateOrbs(this.nodes, this._t, dt, !this.eff || this.eff['motion.spin'])
     if (this.pulses) this.pulses.update(dt)
     if (this.shafts) this.shafts.rotation.y -= dt * 0.12
     const pulse = 1 + Math.sin(this._t * 1.8) * 0.06

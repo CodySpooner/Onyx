@@ -288,7 +288,7 @@ export class EcoView {
         const nd = districts.find((x) => x.folderId === c.userData.folderId)
         if (nd) c.userData.district = nd
       }
-      if (diff.relight.length) this._relight()
+      this._relight() // counts/recency in the labels change even when litBucket doesn't
       this._respawnNpcs(true)
     }
     this._noteDistrict = new Map()
@@ -597,6 +597,8 @@ export class EcoView {
     } else {
       this._npcs = fresh
     }
+    // the hovered NPC may have just been replaced — don't strand its tooltip
+    if (this.errandNpc && !this._npcs.includes(this.errandNpc)) this._dropErrand()
     if (!this.npcMesh) return
     this.npcMesh.count = this._npcs.length
     this._npcs.forEach((npc, i) => {
@@ -913,10 +915,14 @@ export class EcoView {
   // ── teardown ──────────────────────────────────────────────────
   _clearTown() {
     this._dropErrand()
+    // softDot/cloud/window textures are module-cached and shared app-wide —
+    // disposing them here would blank every other lens's sprites
+    const sharedTex = new Set([softDot(), cloudTexture(), windowTexture()])
     for (const child of [...this.group.children]) {
       this.group.remove(child)
       if (child.isInstancedMesh) child.dispose()
-      child.material?.map?.dispose?.()
+      const map = child.material?.map
+      if (map && !sharedTex.has(map)) map.dispose()
       child.material?.dispose()
       if (!child.userData?.sharedGeo) child.geometry?.dispose()
     }
@@ -972,6 +978,7 @@ export class EcoView {
       this._raf = null
     } else if (!this._raf) {
       this.clock.getDelta()
+      this._clockT = 5 // re-read the wall clock now — hours drifted during the pause
       this._loop()
     }
   }

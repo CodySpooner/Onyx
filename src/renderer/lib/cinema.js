@@ -113,21 +113,30 @@ export function makeComposer(renderer, scene, camera, { w, h, bloom = [0.65, 0.5
 // one shared live-apply: every '*'-routed setting lands here for any view
 // exposing renderer/composer/grade/lines/scene. Views cache this.eff for
 // their loops (speed/spin); build-time keys route through rebuilds instead.
+// user sliders scale each view's own tuned baseline (captured on first
+// apply) rather than overwrite it — at defaults every lens keeps its look
+const LINK_LAYERS = ['lines', 'flatLines', 'arcLines', 'links', 'fan', 'edges', 'arcs']
 export function applyCommonSettings(view, s) {
   const e = effective(s)
   view.eff = e
   if (view.renderer) view.renderer.toneMappingExposure = e['look.exposure']
   const bloom = view.composer?.passes?.find((p) => p.strength !== undefined && p.threshold !== undefined)
   if (bloom) {
-    bloom.strength = e['look.bloom']
-    bloom.threshold = e['look.bloomThreshold']
+    if (bloom._base === undefined) bloom._base = { s: bloom.strength, t: bloom.threshold }
+    bloom.strength = bloom._base.s * (e['look.bloom'] / 0.65)
+    bloom.threshold = Math.max(0, Math.min(1, bloom._base.t + (e['look.bloomThreshold'] - 0.3)))
   }
   if (view.grade) {
     view.grade.uniforms.grain.value = e['look.grain']
     view.grade.uniforms.vig.value = e['look.vignette']
     view.grade.uniforms.chroma.value = e['look.chroma']
   }
-  if (view.lines?.material) view.lines.material.opacity = e['look.linkOpacity']
+  for (const k of LINK_LAYERS) {
+    const m = view[k]?.material
+    if (!m) continue
+    if (m.userData.baseOp === undefined) m.userData.baseOp = m.opacity
+    m.opacity = Math.min(1, m.userData.baseOp * (e['look.linkOpacity'] / 0.1))
+  }
   const neb = view.scene?.children.find((ch) => ch.userData?.nebula)
   if (neb) neb.material.color.setScalar(e['theme.nebulaDim'])
 }

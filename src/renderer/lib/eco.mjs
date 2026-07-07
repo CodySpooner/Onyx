@@ -77,6 +77,7 @@ export function ecoLayout(folders, notes, now) {
       }
     })
     .sort((a, b) => b.count - a.count) // big districts inner
+    .slice(0, 240) // nextHop is a Uint8Array — 255 is the sentinel, so cap well below
 
   districts.forEach((d, i) => {
     const r = 34 * Math.sqrt(i + 0.6)

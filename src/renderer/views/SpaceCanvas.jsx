@@ -17,6 +17,8 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAll
   const inst = useRef(null)
   const settingsRef = useRef(settings)
   settingsRef.current = settings // mount effect below reads the latest
+  const dueRef = useRef(dueCount)
+  dueRef.current = dueCount
 
   useEffect(() => {
     const View = VIEWS[view] || BrainView
@@ -25,6 +27,7 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAll
     inst.current.setActive(activeIds)
     inst.current.setLinksMode?.(showAllLinks)
     inst.current.setLabels?.(showLabels)
+    inst.current.setDue?.(dueRef.current)
     inst.current.setPaused?.(paused)
     return () => {
       inst.current?.dispose()
@@ -36,6 +39,9 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAll
   useEffect(() => {
     inst.current?.update(graph)
     inst.current?.setActive(activeIds)
+    // update() rebuilds lines/pulses with their stock look — re-apply the
+    // user's live settings so they survive every graph refresh
+    inst.current?.setSettings?.(settingsRef.current)
   }, [graph])
 
   useEffect(() => {

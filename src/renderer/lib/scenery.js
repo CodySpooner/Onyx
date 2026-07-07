@@ -303,10 +303,11 @@ export class LinkPulses {
 }
 
 // animate a list of orb records: { mesh, spinX, spinY, pulse, baseSize, active }
-export function animateOrbs(nodes, t, dt) {
+export function animateOrbs(nodes, t, dt, spin = true) {
+  const k = spin ? dt * 60 : 0 // speed-scaled clock: speed 0 or spin-off freezes gems
   for (const o of nodes) {
-    o.mesh.rotation.x += o.spinX
-    o.mesh.rotation.y += o.spinY
+    o.mesh.rotation.x += o.spinX * k
+    o.mesh.rotation.y += o.spinY * k
     const pulse = 1 + Math.sin(t * 1.5 + o.pulse) * 0.07
     const dim = o.active === false ? 0.55 : 1
     o.mesh.scale.setScalar(o.baseSize * pulse * dim)

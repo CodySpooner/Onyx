@@ -263,7 +263,7 @@ export class StacksView {
     let dt = Math.min(0.05, this.clock.getDelta())
     if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
-    animateOrbs(this.nodes, this._t, dt)
+    animateOrbs(this.nodes, this._t, dt, !this.eff || this.eff['motion.spin'])
     if (this.arcPulses) this.arcPulses.update(dt)
 
     const cam = this.camera.position

@@ -159,8 +159,9 @@ export function advanceNpc(npc, dt, wp, rng, out) {
           }
         }
       } else {
-        npc.x += (dx / d) * npc.speed * dt
-        npc.z += (dz / d) * npc.speed * dt
+        const step = Math.min(npc.speed * dt, d) // never overshoot the waypoint
+        npc.x += (dx / d) * step
+        npc.z += (dz / d) * step
         const want = Math.atan2(dx, dz)
         let diff = want - npc.heading
         while (diff > Math.PI) diff -= Math.PI * 2
