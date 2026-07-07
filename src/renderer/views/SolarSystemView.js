@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { makeEnv, makeComposer } from '../lib/cinema.js'
+import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeGlowShafts } from '../lib/scenery.js'
@@ -13,8 +13,9 @@ const FOLDER_RING = 120
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 export class SolarSystemView {
-  constructor(container, { onSelect, onHover }) {
+  constructor(container, { onSelect, onHover, settings = null }) {
     this.container = container
+    this.settings = settings
     this.onSelect = onSelect
     this.onHover = onHover || (() => {})
     this.planets = []
@@ -55,6 +56,7 @@ export class SolarSystemView {
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
+    applyCommonSettings(this, settings)
 
     this.linkGroup = new THREE.Group()
     this.scene.add(this.linkGroup)
@@ -278,7 +280,8 @@ export class SolarSystemView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    const dt = Math.min(0.05, this.clock.getDelta())
+    let dt = Math.min(0.05, this.clock.getDelta())
+    if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
     this._positions()
     this._updateLinks()
@@ -380,6 +383,11 @@ export class SolarSystemView {
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
     this.composer.setSize(w, h)
+  }
+
+  setSettings(s) {
+    this.settings = s
+    applyCommonSettings(this, s)
   }
 
   setPaused(p) {

@@ -18,6 +18,15 @@ const ICONS = {
       strokeLinecap="round"
     />
   ),
+  tune: (
+    <path
+      d='M4 8h10M18 8h2M4 16h2M10 16h10M14 5v6M8 13v6'
+      fill='none'
+      stroke='currentColor'
+      strokeWidth='1.6'
+      strokeLinecap='round'
+    />
+  ),
   reset: (
     <path
       d="M19 12a7 7 0 11-2-4.9M19 4v4h-4"
@@ -40,11 +49,12 @@ function TBtn({ icon, on, onClick, title }) {
   )
 }
 
-export function HudToolbar({ showAllLinks, onLinks, showLabels, onLabels, onReset }) {
+export function HudToolbar({ showAllLinks, onLinks, showLabels, onLabels, onReset, onTune, tuneOn = false }) {
   return (
     <aside className="hud-right glass">
       <TBtn icon="links" on={showAllLinks} onClick={onLinks} title="Toggle links" />
       <TBtn icon="labels" on={showLabels} onClick={onLabels} title="Toggle labels" />
+      <TBtn icon="tune" on={tuneOn} onClick={onTune} title="Customize graphs" />
       <TBtn icon="reset" onClick={onReset} title="Reset camera" />
     </aside>
   )

@@ -1,12 +1,13 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { makeEnv, makeComposer } from '../lib/cinema.js'
+import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { createSim } from '../lib/force.mjs'
 import { detectClusters, CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { makeLabel } from '../lib/label.js'
 import { addLights, makeStarfield, makeNebula, makeGlowShafts, softDot, unitGeometry, SHAPES, shapeFor } from '../lib/scenery.js'
 import { buildCurveTable, advanceMote } from '../lib/flow.mjs'
+import { paletteFor } from '../lib/graph-settings.mjs'
 
 const ORPHAN_COLOR = '#4a5470'
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -18,8 +19,9 @@ const SAMPLES = 24
 // Despite being the richest lens it draws in ~15 calls — everything heavy
 // is instanced or a single Points buffer.
 export class NexusView {
-  constructor(container, { onSelect, onHover }) {
+  constructor(container, { onSelect, onHover, settings = null }) {
     this.container = container
+    this.settings = settings
     this.onSelect = onSelect
     this.onHover = onHover || (() => {})
     this.recs = [] // { id, kind, instanceIdx, pos, seed, size, active }
@@ -61,6 +63,7 @@ export class NexusView {
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
+    applyCommonSettings(this, settings)
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -188,7 +191,7 @@ export class NexusView {
         pos,
         seed: hashAngle(note.id),
         size: clamp(0.55 + deg * 0.11, 0.55, 2.4),
-        color: new THREE.Color(ci >= 0 ? CLUSTER_PALETTE[ci % CLUSTER_PALETTE.length] : ORPHAN_COLOR),
+        color: new THREE.Color(ci >= 0 ? paletteFor(this.settings).clusters[ci % 12] : ORPHAN_COLOR),
         active: true
       })
 
@@ -350,7 +353,8 @@ export class NexusView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    const dt = Math.min(0.05, this.clock.getDelta())
+    let dt = Math.min(0.05, this.clock.getDelta())
+    if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
     const t = this._t
 
@@ -472,6 +476,11 @@ export class NexusView {
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
     this.composer.setSize(w, h)
+  }
+
+  setSettings(s) {
+    this.settings = s
+    applyCommonSettings(this, s)
   }
 
   setPaused(p) {

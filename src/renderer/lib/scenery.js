@@ -48,8 +48,8 @@ export function shapeFor(type) {
 }
 
 // returns { mesh, spinX, spinY, pulse }
-export function makeOrb(colorHex, size, type, id) {
-  const kind = shapeFor(type)
+export function makeOrb(colorHex, size, type, id, shapeOverride = null) {
+  const kind = shapeOverride && shapeOverride !== 'auto' ? shapeOverride : shapeFor(type)
   const color = new THREE.Color(colorHex)
   // physical gems: clearcoat + iridescence read as cut stones under the
   // PMREM environment (cinema.js). NO transmission — it would re-render the
@@ -160,6 +160,7 @@ export function makeNebula(hexA = '#2a1a4d', hexB = '#0a1836') {
     new THREE.SphereGeometry(600, 32, 32),
     new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, depthWrite: false })
   )
+  mesh.userData.nebula = true // customization: nebulaDim live-targets this
   return mesh
 }
 

@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { makeEnv, makeComposer } from '../lib/cinema.js'
+import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, animateOrbs } from '../lib/scenery.js'
@@ -12,8 +12,9 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 // Deterministic 3D constellation: notes placed by folder cluster + hash.
 export class GraphView {
-  constructor(container, { onSelect }) {
+  constructor(container, { onSelect, settings = null }) {
     this.container = container
+    this.settings = settings
     this.onSelect = onSelect
     this.nodes = []
     this.labels = []
@@ -44,6 +45,7 @@ export class GraphView {
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
+    applyCommonSettings(this, settings)
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -178,7 +180,8 @@ export class GraphView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    const dt = Math.min(0.05, this.clock.getDelta())
+    let dt = Math.min(0.05, this.clock.getDelta())
+    if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
     this.group.rotation.y += 0.0006
     animateOrbs(this.nodes, this._t, dt)
@@ -186,6 +189,11 @@ export class GraphView {
     this.controls.update()
     if (this.grade) this.grade.uniforms.time.value = this._t
     this.composer.render()
+  }
+
+  setSettings(s) {
+    this.settings = s
+    applyCommonSettings(this, s)
   }
 
   setPaused(p) {

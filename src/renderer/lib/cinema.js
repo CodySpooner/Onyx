@@ -4,6 +4,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { effective } from './graph-settings.mjs'
 
 // ── the AAA kit ─────────────────────────────────────────────────
 // Kit A: a PMREM environment so gem facets catch colored studio reflections.
@@ -107,4 +108,26 @@ export function makeComposer(renderer, scene, camera, { w, h, bloom = [0.65, 0.5
     composer.dispose() // frees renderTarget1/2 — renderer.dispose() does NOT
   }
   return { composer, grade, dispose }
+}
+
+// one shared live-apply: every '*'-routed setting lands here for any view
+// exposing renderer/composer/grade/lines/scene. Views cache this.eff for
+// their loops (speed/spin); build-time keys route through rebuilds instead.
+export function applyCommonSettings(view, s) {
+  const e = effective(s)
+  view.eff = e
+  if (view.renderer) view.renderer.toneMappingExposure = e['look.exposure']
+  const bloom = view.composer?.passes?.find((p) => p.strength !== undefined && p.threshold !== undefined)
+  if (bloom) {
+    bloom.strength = e['look.bloom']
+    bloom.threshold = e['look.bloomThreshold']
+  }
+  if (view.grade) {
+    view.grade.uniforms.grain.value = e['look.grain']
+    view.grade.uniforms.vig.value = e['look.vignette']
+    view.grade.uniforms.chroma.value = e['look.chroma']
+  }
+  if (view.lines?.material) view.lines.material.opacity = e['look.linkOpacity']
+  const neb = view.scene?.children.find((ch) => ch.userData?.nebula)
+  if (neb) neb.material.color.setScalar(e['theme.nebulaDim'])
 }

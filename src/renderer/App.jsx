@@ -31,6 +31,8 @@ import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
 import { TriageModal } from './components/TriageModal.jsx'
 import { buildWorkspaces, scopeGraph, validateWorkspaceUi } from './lib/workspaces.mjs'
+import { validateSettings, needsRebuild, DEFAULTS as GSET_DEFAULTS } from './lib/graph-settings.mjs'
+import { CustomizeDrawer } from './components/CustomizeDrawer.jsx'
 import { WorkspacePill, WorkspaceModal } from './components/WorkspacePill.jsx'
 import { FindReplaceModal } from './components/FindReplaceModal.jsx'
 import { NotesMode } from './modes/NotesMode.jsx'
@@ -66,6 +68,9 @@ export default function App() {
   const [dismissed, setDismissed] = useState(() => new Set())
   const [triageRows, setTriageRows] = useState([])
   const [pendingTasks, setPendingTasks] = useState(() => new Set())
+  const [gset, setGset] = useState(null) // null until loaded — views fall back to defaults
+  const [showCustomize, setShowCustomize] = useState(false)
+  const gsetTimer = useRef(null)
   const [wsManual, setWsManual] = useState([])
   const [workspaceId, setWorkspaceId] = useState(null)
   const [wsModal, setWsModal] = useState(null) // null | 'new' | workspace object
@@ -108,6 +113,7 @@ export default function App() {
     window.onyx.storeGet?.('suggest-dismissed').then((d) => {
       if (Array.isArray(d?.keys)) setDismissed(new Set(d.keys))
     })
+    window.onyx.storeGet?.('graph-custom').then((s0) => setGset(validateSettings(s0)))
     Promise.all([window.onyx.storeGet?.('workspaces'), window.onyx.storeGet?.('workspace-ui')]).then(([w, ui]) => {
       wsPending.current = { manual: w?.manual, activeId: ui?.activeId }
     })
@@ -240,6 +246,15 @@ export default function App() {
   useEffect(() => {
     if (wsLoaded.current) window.onyx.storeSet?.('workspaces', { manual: wsManual })
   }, [wsManual])
+  const updateGset = (patch) => {
+    setGset((prev) => {
+      const next = validateSettings({ ...(prev || GSET_DEFAULTS), ...patch })
+      if (needsRebuild(prev, next, view)) setResetNonce((n) => n + 1)
+      clearTimeout(gsetTimer.current)
+      gsetTimer.current = setTimeout(() => window.onyx.storeSet?.('graph-custom', next), 400)
+      return next
+    })
+  }
   const saveWorkspace = (w) => {
     setWsManual((prev) => {
       const at = prev.findIndex((x) => x.id === w.id)
@@ -690,6 +705,7 @@ export default function App() {
           resetNonce={resetNonce}
           paused={mode !== 'brain'}
           focus={flyTo}
+          settings={gset}
         />
       </div>
       <TopBar
@@ -743,7 +759,12 @@ export default function App() {
               showLabels={showLabels}
               onLabels={toggleLabels}
               onReset={() => setResetNonce((n) => n + 1)}
+              onTune={() => setShowCustomize((v) => !v)}
+              tuneOn={showCustomize}
             />
+            {showCustomize && (
+              <CustomizeDrawer gset={gset} view={view} onChange={updateGset} onClose={() => setShowCustomize(false)} />
+            )}
           </div>
           <HoverLayer graph={scoped} />
         </>

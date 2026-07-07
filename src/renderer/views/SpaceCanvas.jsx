@@ -11,13 +11,15 @@ import { NexusView } from './NexusView.js'
 
 const VIEWS = { brain: BrainView, nexus: NexusView, atlas: AtlasView, stacks: StacksView, city: ArchiveCityView, solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
 
-export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0, paused = false, focus = null }) {
+export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0, paused = false, focus = null, settings = null, dueCount = 0 }) {
   const ref = useRef(null)
   const inst = useRef(null)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings // mount effect below reads the latest
 
   useEffect(() => {
     const View = VIEWS[view] || BrainView
-    inst.current = new View(ref.current, { onSelect, onHover })
+    inst.current = new View(ref.current, { onSelect, onHover, settings: settingsRef.current })
     inst.current.update(graph)
     inst.current.setActive(activeIds)
     inst.current.setLinksMode?.(showAllLinks)
@@ -54,6 +56,14 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAll
   useEffect(() => {
     if (focus?.id) inst.current?.focus?.(focus.id)
   }, [focus])
+
+  useEffect(() => {
+    inst.current?.setSettings?.(settings)
+  }, [settings])
+
+  useEffect(() => {
+    inst.current?.setDue?.(dueCount)
+  }, [dueCount])
 
   return <div className="canvas" ref={ref} />
 }

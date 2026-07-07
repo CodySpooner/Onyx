@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { makeEnv, makeComposer } from '../lib/cinema.js'
+import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { makeLabel } from '../lib/label.js'
 import { addLights, makeStarfield, makeNebula, softDot } from '../lib/scenery.js'
 import { districtGrid } from '../lib/layouts.mjs'
@@ -79,8 +79,9 @@ function holoFloorTexture(districtAngles) {
 // on a holo-deck, every note a glowing monolith whose height is its degree.
 // Tall towers are hub notes; read the skyline like a bar chart of your brain.
 export class ArchiveCityView {
-  constructor(container, { onSelect, onHover }) {
+  constructor(container, { onSelect, onHover, settings = null }) {
     this.container = container
+    this.settings = settings
     this.onSelect = onSelect
     this.onHover = onHover || (() => {})
     this.towers = []
@@ -119,6 +120,7 @@ export class ArchiveCityView {
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
+    applyCommonSettings(this, settings)
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -356,7 +358,8 @@ export class ArchiveCityView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    const dt = Math.min(0.05, this.clock.getDelta())
+    let dt = Math.min(0.05, this.clock.getDelta())
+    if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
 
     // hover lift + crown breathe; beacons pulse
@@ -452,6 +455,11 @@ export class ArchiveCityView {
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
     this.composer.setSize(w, h)
+  }
+
+  setSettings(s) {
+    this.settings = s
+    applyCommonSettings(this, s)
   }
 
   setPaused(p) {

@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { makeEnv, makeComposer } from '../lib/cinema.js'
+import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs } from '../lib/scenery.js'
 import { shelfLayout, SHELF } from '../lib/layouts.mjs'
@@ -13,8 +13,9 @@ import { shelfLayout, SHELF } from '../lib/layouts.mjs'
 // is a 2D grid bent into a shallow arc. Ambient links are OFF; hovering a
 // note makes its references leap across the hall as golden arcs.
 export class StacksView {
-  constructor(container, { onSelect, onHover }) {
+  constructor(container, { onSelect, onHover, settings = null }) {
     this.container = container
+    this.settings = settings
     this.onSelect = onSelect
     this.onHover = onHover || (() => {})
     this.nodes = []
@@ -64,6 +65,7 @@ export class StacksView {
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
+    applyCommonSettings(this, settings)
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -258,7 +260,8 @@ export class StacksView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    const dt = Math.min(0.05, this.clock.getDelta())
+    let dt = Math.min(0.05, this.clock.getDelta())
+    if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
     animateOrbs(this.nodes, this._t, dt)
     if (this.arcPulses) this.arcPulses.update(dt)
@@ -326,6 +329,11 @@ export class StacksView {
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
     this.composer.setSize(w, h)
+  }
+
+  setSettings(s) {
+    this.settings = s
+    applyCommonSettings(this, s)
   }
 
   setPaused(p) {

@@ -3,11 +3,12 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { makeEnv, makeComposer } from '../lib/cinema.js'
+import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { detectClusters, CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, animateOrbs, softDot } from '../lib/scenery.js'
 import { archipelagoLayout } from '../lib/layouts.mjs'
+import { paletteFor } from '../lib/graph-settings.mjs'
 
 const ORPHAN_COLOR = '#4a5470'
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
@@ -16,8 +17,9 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 // wide gulfs between them, idea-pulses ferrying along elevated arcs.
 // Pan the map, read every place-name at rest.
 export class AtlasView {
-  constructor(container, { onSelect, onHover }) {
+  constructor(container, { onSelect, onHover, settings = null }) {
     this.container = container
+    this.settings = settings
     this.onSelect = onSelect
     this.onHover = onHover || (() => {})
     this.nodes = []
@@ -61,6 +63,7 @@ export class AtlasView {
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
+    applyCommonSettings(this, settings)
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -94,7 +97,7 @@ export class AtlasView {
 
     // bioluminescent island discs
     for (const isl of islands) {
-      const color = CLUSTER_PALETTE[isl.ci % CLUSTER_PALETTE.length]
+      const color = paletteFor(this.settings).clusters[isl.ci % 12]
       const disc = new THREE.Sprite(
         new THREE.SpriteMaterial({ map: softDot(), color: new THREE.Color(color), transparent: true, opacity: 0.1, depthWrite: false, blending: THREE.AdditiveBlending })
       )
@@ -117,7 +120,7 @@ export class AtlasView {
       const p = pos.get(note.id)
       if (!p) return
       const ci = clusterOf.get(note.id)
-      const colorHex = ci >= 0 ? CLUSTER_PALETTE[ci % CLUSTER_PALETTE.length] : ORPHAN_COLOR
+      const colorHex = ci >= 0 ? paletteFor(this.settings).clusters[ci % 12] : ORPHAN_COLOR
       const deg = degOf.get(note.id)
       const size = clamp(0.55 + deg * 0.11, 0.55, 2.4)
       const orb = makeOrb(colorHex, size, note.type, note.id)
@@ -262,7 +265,8 @@ export class AtlasView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    const dt = Math.min(0.05, this.clock.getDelta())
+    let dt = Math.min(0.05, this.clock.getDelta())
+    if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
     animateOrbs(this.nodes, this._t, dt)
     if (this.pulses) this.pulses.update(dt)
@@ -332,6 +336,11 @@ export class AtlasView {
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
     this.composer.setSize(w, h)
+  }
+
+  setSettings(s) {
+    this.settings = s
+    applyCommonSettings(this, s)
   }
 
   setPaused(p) {

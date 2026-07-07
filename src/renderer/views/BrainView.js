@@ -3,20 +3,22 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { makeEnv, makeComposer } from '../lib/cinema.js'
+import { makeEnv, makeComposer, applyCommonSettings } from '../lib/cinema.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { createSim } from '../lib/force.mjs'
 import { detectClusters, CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses, softDot } from '../lib/scenery.js'
 import { easeInOutCubic, easeOutBack, clamp01 } from '../lib/cinemath.mjs'
+import { paletteFor, val, folderColorIndex, effective } from '../lib/graph-settings.mjs'
 
 const ORPHAN_COLOR = '#4a5470'
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 export class BrainView {
-  constructor(container, { onSelect, onHover }) {
+  constructor(container, { onSelect, onHover, settings = null }) {
     this.container = container
+    this.settings = settings
     this.onSelect = onSelect
     this.onHover = onHover || (() => {})
     this.nodes = [] // { mesh, id, simNode, baseSize, spinX, spinY, pulse, phase, active, cluster }
@@ -35,7 +37,8 @@ export class BrainView {
 
     this.scene = new THREE.Scene()
     this.scene.fog = new THREE.FogExp2(0x07070d, 0.0011)
-    this.scene.add(makeNebula('#1c1442', '#0a1a3c'))
+    const themeN = paletteFor(settings).nebula
+    this.scene.add(makeNebula(themeN[0], themeN[1]))
     this.scene.add(makeStarfield())
     addLights(this.scene)
 
@@ -57,6 +60,7 @@ export class BrainView {
     this.grade = cine.grade
     this.envTex = makeEnv(this.renderer)
     this.scene.environment = this.envTex
+    applyCommonSettings(this, settings)
 
     this.group = new THREE.Group()
     this.scene.add(this.group)
@@ -91,19 +95,30 @@ export class BrainView {
 
     const ids = graph.notes.map((n) => n.id)
     const { clusterOf } = detectClusters(ids, graph.links)
-    this.sim = createSim(ids, graph.links)
+    const eff0 = effective(this.settings)
+    this.sim = createSim(ids, graph.links, {
+      repulsion: eff0['physics.repulsion'],
+      restLen: eff0['physics.linkLength'],
+      maxRadius: eff0['physics.spread'],
+      center: eff0['physics.gravity']
+    })
     this.sim.tick(300) // warm up before first paint
 
     graph.notes.forEach((note) => {
       const simNode = this.sim.byId.get(note.id)
       const ci = clusterOf.get(note.id)
-      const colorHex = ci >= 0 ? CLUSTER_PALETTE[ci % CLUSTER_PALETTE.length] : ORPHAN_COLOR
+      const theme = paletteFor(this.settings)
+      const colorHex = val(this.settings, 'theme.folderColors')
+        ? theme.clusters[folderColorIndex(note.folder)]
+        : ci >= 0
+          ? theme.clusters[ci % theme.clusters.length]
+          : theme.orphan
       const deg = note.outLinks.length + note.inLinks.length
       const size = clamp(0.55 + deg * 0.11, 0.55, 2.4)
-      const orb = makeOrb(colorHex, size, note.type, note.id)
+      const orb = makeOrb(colorHex, size, note.type, note.id, val(this.settings, 'look.gemShape'))
       orb.mesh.position.set(simNode.x, simNode.y, simNode.z)
       this.group.add(orb.mesh)
-      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci, bornAt: prevIds.has(note.id) ? this._t - 0.6 : this._t + newCount++ * 0.015 }
+      const rec = { ...orb, id: note.id, simNode, baseSize: size, phase: hashAngle(note.id), active: true, cluster: ci, bornAt: !effective(this.settings)['motion.spawn'] || prevIds.has(note.id) ? this._t - 0.6 : this._t + newCount++ * 0.015 }
       this.nodes.push(rec)
       this.byId.set(note.id, rec)
 
@@ -127,7 +142,7 @@ export class BrainView {
       new THREE.LineBasicMaterial({ color: 0x86b8ff, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false })
     )
     this.group.add(this.lines)
-    this.pulses = new LinkPulses(this.group, this.segArray, 0xbfe0ff, 90)
+    this.pulses = new LinkPulses(this.group, this.segArray, paletteFor(this.settings).pulse, Math.round(90 * effective(this.settings)['motion.pulses']))
 
     // hover highlight overlay (incident links only)
     this.hlGeo = new THREE.BufferGeometry()
@@ -320,7 +335,8 @@ export class BrainView {
 
   _loop() {
     this._raf = requestAnimationFrame(() => this._loop())
-    const dt = Math.min(0.05, this.clock.getDelta())
+    let dt = Math.min(0.05, this.clock.getDelta())
+    if (this.eff) dt *= this.eff['motion.speed']
     this._t += dt
 
     if (this.sim) this.sim.tick(2)
@@ -343,13 +359,15 @@ export class BrainView {
         p.y + Math.sin(this._t * 0.9 + n.phase * 2) * 0.35,
         p.z + Math.cos(this._t * 0.8 + n.phase) * 0.35
       )
-      n.mesh.rotation.x += n.spinX
-      n.mesh.rotation.y += n.spinY
+      if (!this.eff || this.eff['motion.spin']) {
+        n.mesh.rotation.x += n.spinX
+        n.mesh.rotation.y += n.spinY
+      }
       const pulse = 1 + Math.sin(this._t * 1.5 + n.pulse) * 0.07
       // staggered cascade-pop on (re)build — easeOutBack overshoot sells it
       n.spawnK = clamp01((this._t - (n.bornAt ?? 0)) / 0.6)
       const spawn = easeOutBack(n.spawnK)
-      n.mesh.scale.setScalar(Math.max(0.001, n.baseSize * pulse * (n.active ? 1 : 0.55) * spawn))
+      n.mesh.scale.setScalar(Math.max(0.001, n.baseSize * (this.eff ? this.eff['look.nodeSize'] : 1) * pulse * (n.active ? 1 : 0.55) * spawn))
     }
 
     // live link buffer (lines + pulses share it)
@@ -378,7 +396,8 @@ export class BrainView {
       }
       l.sprite.position.set(l.rec.mesh.position.x, l.rec.mesh.position.y + l.rec.baseSize + 1.3, l.rec.mesh.position.z)
       const d = tmp.copy(l.sprite.position).distanceTo(cam)
-      let o = Math.min(0.95, 1 - (d - 230) / 230)
+      const reach = this.eff ? this.eff['look.labelFade'] : 1
+      let o = Math.min(0.95, 1 - (d - 230 * reach) / (230 * reach))
       if (l.rec.spawnK != null) o *= l.rec.spawnK // labels fade in with their orbs
       if (this.activeIds && !this.activeIds.has(l.id)) o *= 0.12
       if (o < 0.06) {
@@ -462,6 +481,11 @@ export class BrainView {
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(w, h)
     this.composer.setSize(w, h)
+  }
+
+  setSettings(s) {
+    this.settings = s
+    applyCommonSettings(this, s)
   }
 
   setPaused(p) {
