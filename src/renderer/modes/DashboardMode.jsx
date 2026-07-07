@@ -245,9 +245,7 @@ export function DashboardMode({ graph, clusters, usage, onSelect, onFilter }) {
         </section>
 
         <section className="dpanel brk panel-in span4" style={{ '--i': 10 }}>
-          <div className="u-label">OPEN TASKS</div>
-          <div className="rule-ticks" />
-          <TasksPanel graph={graph} onSelect={onSelect} limit={20} />
+          <TasksPanel graph={graph} onSelect={onSelect} limit={20} showEmpty />
         </section>
       </div>
     </div>

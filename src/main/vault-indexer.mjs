@@ -119,7 +119,9 @@ export async function scanVault(vaultPath) {
 }
 
 export function readNoteRaw(vaultPath, id) {
-  return fs.readFile(path.join(vaultPath, id), 'utf8')
+  const abs = path.join(vaultPath, id)
+  insideVault(vaultPath, abs) // reads are vault-scoped too — no traversal
+  return fs.readFile(abs, 'utf8')
 }
 
 export async function writeNoteRaw(vaultPath, id, content) {

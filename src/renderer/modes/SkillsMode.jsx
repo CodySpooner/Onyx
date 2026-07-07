@@ -74,7 +74,6 @@ export function SkillsMode({ evaluated }) {
                 strokeOpacity={unlocked ? 0.5 : 1}
                 strokeWidth={unlocked ? 1.4 : 1}
                 strokeDasharray={e.s.state === 'dormant' ? '3 3' : undefined}
-                style={unlocked ? { filter: `drop-shadow(0 0 3px ${col})` } : undefined}
               />
               {unlocked && (
                 <circle r="2" fill={col}>
@@ -116,7 +115,6 @@ export function SkillsMode({ evaluated }) {
                 stroke={col}
                 strokeOpacity={s.unlocked ? 1 : 0.55}
                 strokeDasharray={s.state === 'dormant' ? '3 3' : undefined}
-                style={s.unlocked ? { filter: `drop-shadow(0 0 6px ${col})` } : undefined}
               />
               {s.state === 'dormant' && <text y="3" textAnchor="middle" className="st-lock">🔒</text>}
               <text y={r + 13} textAnchor="middle" className="st-name" fill={s.unlocked ? 'var(--text)' : 'var(--text-faint)'}>

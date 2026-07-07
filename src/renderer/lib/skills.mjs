@@ -108,13 +108,11 @@ export function streaksFromDays(days = {}, now = Date.now()) {
 
 const CANON_VIEWS = ['view.brain', 'view.solar', 'view.core', 'view.globe', 'view.constellation']
 
-export function buildSkillStats(graph, usage, now, aiEnabled = false) {
+// graph-only half — expensive (clusters/bridges/maturity); memoize on [graph]
+export function buildGraphSkillStats(graph, now) {
   const notes = graph.notes
   const vs = vaultStats(graph)
   const { clusterOf, clusterCount } = detectClusters(notes.map((n) => n.id), graph.links)
-  const counters = usage?.counters || {}
-  const st = streaksFromDays(usage?.days || {}, now)
-  const visits = CANON_VIEWS.map((v) => counters[v] || 0)
   return {
     notes: notes.length,
     links: graph.meta.linkCount,
@@ -126,7 +124,17 @@ export function buildSkillStats(graph, usage, now, aiEnabled = false) {
     maturityScore: maturity(notes, now).score,
     totalWords: notes.reduce((s, n) => s + (n.wordCount || 0), 0),
     taggedPct: notes.length ? Math.round((100 * notes.filter((n) => (n.tags || []).length).length) / notes.length) : 0,
-    weeksActive: velocity(notes, now).weeks.filter((w) => w > 0).length,
+    weeksActive: velocity(notes, now).weeks.filter((w) => w > 0).length
+  }
+}
+
+// usage-only half — cheap; runs on every counter bump
+export function mergeUsageStats(graphStats, usage, now, aiEnabled = false) {
+  const counters = usage?.counters || {}
+  const st = streaksFromDays(usage?.days || {}, now)
+  const visits = CANON_VIEWS.map((v) => counters[v] || 0)
+  return {
+    ...graphStats,
     activeDays: st.activeDays,
     currentStreak: st.current,
     bestStreak: st.best,
@@ -135,6 +143,10 @@ export function buildSkillStats(graph, usage, now, aiEnabled = false) {
     aiEnabled,
     counters
   }
+}
+
+export function buildSkillStats(graph, usage, now, aiEnabled = false) {
+  return mergeUsageStats(buildGraphSkillStats(graph, now), usage, now, aiEnabled)
 }
 
 export function evaluateSkills(stats) {

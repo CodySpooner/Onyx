@@ -4,12 +4,19 @@ export function QuickCapture({ targetLabel, onCapture, onClose }) {
   const [text, setText] = useState('')
   const [flash, setFlash] = useState(false)
   const inputRef = useRef(null)
+  const busy = useRef(false) // blocks double-Enter / key auto-repeat
   useEffect(() => inputRef.current?.focus(), [])
 
   const submit = async () => {
+    if (busy.current) return
     const t = text.trim()
     if (!t) return onClose()
-    await onCapture(t)
+    busy.current = true
+    const ok = await onCapture(t)
+    if (ok === false) {
+      busy.current = false // capture failed — keep the text, let them retry
+      return
+    }
     setFlash(true)
     setTimeout(onClose, 380)
   }

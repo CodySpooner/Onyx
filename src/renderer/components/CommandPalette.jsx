@@ -66,6 +66,7 @@ export function CommandPalette({ graph, actions, onSelectNote, onClose }) {
   }
 
   const onKey = (e) => {
+    if (e.ctrlKey || e.metaKey) return // let global shortcuts (Ctrl+K toggle, Ctrl+1-3) bubble to App
     e.stopPropagation()
     if (e.key === 'Escape') onClose()
     else if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) {

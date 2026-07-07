@@ -19,7 +19,7 @@ function renderBody(raw, basenameToId) {
   return md.render(withLinks)
 }
 
-export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage }) {
+export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage, onEditingChange }) {
   const [raw, setRaw] = useState(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -27,6 +27,13 @@ export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTog
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState('')
   const ref = useRef(null)
+  const baseRef = useRef(null) // disk content when editing began (conflict check)
+
+  // report dirtiness upward so App can guard against silent draft loss
+  useEffect(() => {
+    onEditingChange?.(editing && draft !== raw)
+  }, [editing, draft, raw, onEditingChange])
+  useEffect(() => () => onEditingChange?.(false), [onEditingChange])
   const note = graph.notes.find((n) => n.id === id)
 
   const basenameToId = useMemo(
@@ -62,14 +69,24 @@ export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTog
   }, [raw, editing, onSelect])
 
   const startEdit = () => {
+    baseRef.current = raw || ''
     setDraft(raw || '')
     setEditing(true)
   }
   const save = async () => {
     setSaving(true)
+    // conflict check: did the file change on disk (capture, Obsidian) mid-edit?
+    const disk = await window.onyx.readNote(id)
+    if (disk != null && disk !== baseRef.current) {
+      if (!window.confirm('This note changed on disk while you were editing — overwrite with your version?')) {
+        setSaving(false)
+        return
+      }
+    }
     const ok = await window.onyx.writeNote(id, draft)
     setSaving(false)
     if (ok) {
+      baseRef.current = draft
       setRaw(draft)
       setEditing(false)
       onUsage?.('noteEdit')

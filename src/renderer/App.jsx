@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { matchFilter } from './lib/graph.mjs'
 import { vaultStats } from './lib/stats.mjs'
 import { detectClusters } from './lib/clusters.mjs'
-import { buildSkillStats, evaluateSkills } from './lib/skills.mjs'
+import { buildGraphSkillStats, mergeUsageStats, evaluateSkills } from './lib/skills.mjs'
 import { bus } from './lib/bus.mjs'
 import { SpaceCanvas } from './views/SpaceCanvas.jsx'
 import { NoteReader } from './components/NoteReader.jsx'
@@ -37,9 +37,19 @@ export default function App() {
   const [usage, setUsage] = useState(null)
   const [cfg, setCfg] = useState(null)
   const [booting, setBooting] = useState(true)
+  const [bootTimedOut, setBootTimedOut] = useState(false)
   const [pins, setPins] = useState([])
   const [flyTo, setFlyTo] = useState(null)
   const lastOpened = useRef(null)
+  const announced = useRef(new Set()) // unlock toasts already shown this session
+
+  // if the vault can't be scanned (bad path, fresh install), don't hang the
+  // boot screen forever — fall through to the vault picker
+  useEffect(() => {
+    if (graph) return
+    const t = setTimeout(() => setBootTimedOut(true), 4000)
+    return () => clearTimeout(t)
+  }, [graph])
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
@@ -83,16 +93,22 @@ export default function App() {
     () => (graph ? detectClusters(graph.notes.map((n) => n.id), graph.links) : { clusterCount: 0, clusterOf: new Map() }),
     [graph]
   )
+  // expensive graph-only half memoized on [graph]; cheap usage merge per bump
+  const graphSkillStats = useMemo(() => (graph ? buildGraphSkillStats(graph, Date.now()) : null), [graph])
   const evaluated = useMemo(
-    () => (graph ? evaluateSkills(buildSkillStats(graph, usage, Date.now())) : null),
-    [graph, usage]
+    () => (graphSkillStats ? evaluateSkills(mergeUsageStats(graphSkillStats, usage, Date.now())) : null),
+    [graphSkillStats, usage]
   )
 
-  // unlock-diff: toast + persist newly unlocked skills (works in any mode)
+  // unlock-diff: toast + persist newly unlocked skills (announced ref makes
+  // it idempotent while a bumpUsage response is still in flight)
   useEffect(() => {
     if (!evaluated || !usage) return
-    const fresh = evaluated.skills.filter((s) => s.unlocked && !usage.unlockedAt?.[s.id])
+    const fresh = evaluated.skills.filter(
+      (s) => s.unlocked && !usage.unlockedAt?.[s.id] && !announced.current.has(s.id)
+    )
     if (!fresh.length) return
+    for (const s of fresh) announced.current.add(s.id)
     if (fresh.length > 3) {
       bus.emit('toast', { msg: `◆ ${fresh.length} SKILLS UNLOCKED · +${fresh.length * 50} XP`, kind: 'skill' })
     } else {
@@ -102,8 +118,9 @@ export default function App() {
   }, [evaluated, usage])
 
   // keyboard contract — one listener; handler reads fresh state via ref
+  // (merge-assign: callbacks like openDaily and the dirty flag must survive renders)
   const kbRef = useRef({})
-  kbRef.current = { overlay, selected, mode }
+  Object.assign(kbRef.current, { overlay, selected, mode })
   useEffect(() => {
     const onKey = (e) => {
       const k = kbRef.current
@@ -130,31 +147,25 @@ export default function App() {
       }
       if (e.key === 'Escape' && !inInput) {
         if (k.overlay) setOverlay(null)
-        else if (k.selected) setSelected(null)
-        else bus.emit('hover', null)
+        else if (k.selected) {
+          if (!k.dirty || window.confirm('Discard unsaved edits?')) setSelected(null)
+        } else bus.emit('hover', null)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  if (!graph) {
-    return <BootSequence graph={null} clusterCount={0} vaultPath={cfg?.vaultPath || ''} onDone={() => {}} />
-  }
+  const activeIds = graph ? new Set(graph.notes.filter((n) => matchFilter(n, filter)).map((n) => n.id)) : null
+  const filtering = graph ? activeIds.size !== graph.notes.length : false
+  const featured = graph ? graph.notes.find((n) => n.id === selected) || stats.hubs[0] : null
 
-  if (!graph.notes.length) {
-    return (
-      <div className="empty">
-        <h1>◑ Onyx</h1>
-        <p>No notes found in this folder.</p>
-        <button onClick={() => window.onyx.pickVault().then(setGraph)}>Choose vault folder</button>
-      </div>
-    )
+  // the ONE dirty-guarded selection choke point — every note-switch routes here
+  const guardDirty = () => !kbRef.current.dirty || window.confirm('Discard unsaved edits?')
+  const selectNote = (id) => {
+    if (!guardDirty()) return
+    setSelected(id)
   }
-
-  const activeIds = new Set(graph.notes.filter((n) => matchFilter(n, filter)).map((n) => n.id))
-  const filtering = activeIds.size !== graph.notes.length
-  const featured = graph.notes.find((n) => n.id === selected) || stats.hubs[0]
 
   const toggleLinks = () => {
     const next = !showAllLinks
@@ -167,6 +178,7 @@ export default function App() {
     window.onyx.setConfig({ showLabels: next })
   }
   const handleCreate = async () => {
+    if (!guardDirty()) return
     const folder = filter.folders[0] || '(root)'
     const id = await window.onyx.createNote(folder, 'Untitled')
     if (id) {
@@ -180,6 +192,7 @@ export default function App() {
     window.onyx.bumpUsage?.(`view.${v}`).then(setUsage)
   }
   const openNote = (id) => {
+    if (!guardDirty()) return
     setSelected(id)
     setFlyTo((f) => ({ id, nonce: (f?.nonce || 0) + 1 }))
     if (id && lastOpened.current !== id) {
@@ -202,10 +215,22 @@ export default function App() {
     const now = new Date()
     const id = dailyId(now, folder)
     await window.onyx.ensureNote?.(id, dailyTemplate(now))
-    const raw = (await window.onyx.readNote(id)) ?? dailyTemplate(now)
-    await window.onyx.writeNote(id, appendCapture(raw, text, now))
+    // ensureNote guarantees the file exists — a null read is a READ ERROR
+    // (OneDrive lock, AV scan). Never fall back to the template: that path
+    // would overwrite the whole day. Abort and let the user retry.
+    const raw = await window.onyx.readNote(id)
+    if (raw == null) {
+      bus.emit('toast', { msg: '✗ capture failed — daily note unreadable, try again', kind: 'err', ttl: 4000 })
+      return false
+    }
+    const ok = await window.onyx.writeNote(id, appendCapture(raw, text, now))
+    if (!ok) {
+      bus.emit('toast', { msg: '✗ capture failed — vault not writable', kind: 'err', ttl: 4000 })
+      return false
+    }
     window.onyx.bumpUsage?.('captureSave').then(setUsage)
     bus.emit('toast', { msg: `◆ captured to ${id.split('/').pop()}`, kind: 'info', ttl: 2200 })
+    return true
   }
   const togglePin = (id) => {
     if (!id) return
@@ -247,12 +272,14 @@ export default function App() {
 
   return (
     <div className="app hud">
+      {graph && graph.notes.length > 0 && (
+        <>
       <div className={`stage ${mode !== 'brain' ? 'dimmed' : ''}`}>
         <SpaceCanvas
           view={view}
           graph={graph}
           activeIds={filtering ? activeIds : null}
-          onSelect={setSelected}
+          onSelect={selectNote}
           onHover={(h) => bus.emit('hover', h)}
           showAllLinks={showAllLinks}
           showLabels={showLabels}
@@ -307,7 +334,7 @@ export default function App() {
           graph={graph}
           clusters={clusters}
           usage={usage}
-          onSelect={setSelected}
+          onSelect={openNote}
           onFilter={(f) => {
             setFilter(f)
             setMode('brain')
@@ -330,11 +357,14 @@ export default function App() {
           id={selected}
           graph={graph}
           onSelect={openNote}
-          onClose={() => setSelected(null)}
+          onClose={() => selectNote(null)}
           pinned={pins.includes(selected)}
           onTogglePin={() => togglePin(selected)}
           onRenamed={handleRenamed}
           onUsage={(name) => window.onyx.bumpUsage?.(name).then(setUsage)}
+          onEditingChange={(d) => {
+            kbRef.current.dirty = d
+          }}
         />
       )}
       <StatusBar
@@ -346,14 +376,32 @@ export default function App() {
       <Toasts />
       <div className="scanlines" aria-hidden />
       <UpdateToast />
-      {booting && (
-        <BootSequence
-          graph={graph}
-          clusterCount={clusters.clusterCount}
-          vaultPath={cfg?.vaultPath || ''}
-          onDone={() => setBooting(false)}
-        />
+        </>
       )}
+      {graph && !graph.notes.length && (
+        <div className="empty">
+          <h1>◑ Onyx</h1>
+          <p>No notes found in this folder.</p>
+          <button onClick={() => window.onyx.pickVault().then(setGraph)}>Choose vault folder</button>
+        </div>
+      )}
+      {(booting || !graph) &&
+        (!graph && bootTimedOut ? (
+          <div className="boot">
+            <div className="empty">
+              <h1>◑ Onyx</h1>
+              <p>Couldn't open the vault — pick a folder of .md files.</p>
+              <button onClick={() => window.onyx.pickVault().then(setGraph)}>Choose vault folder</button>
+            </div>
+          </div>
+        ) : (
+          <BootSequence
+            graph={graph}
+            clusterCount={clusters.clusterCount}
+            vaultPath={cfg?.vaultPath || ''}
+            onDone={() => setBooting(false)}
+          />
+        ))}
     </div>
   )
 }

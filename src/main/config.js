@@ -2,8 +2,10 @@ import { app } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
+// vaultPath intentionally empty by default: fresh installs route to the
+// vault picker instead of scanning a path that only exists on one machine.
 const DEFAULTS = {
-  vaultPath: 'C:\\Users\\Xody2\\OneDrive\\Desktop\\Xody Bets Website Vault',
+  vaultPath: '',
   sizeBy: 'links',
   colorBy: 'folder',
   showAllLinks: true,

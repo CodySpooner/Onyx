@@ -137,7 +137,6 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
       </div>
 
       <div className="hud-sec">
-        <div className="sec-h">TASKS</div>
         <TasksPanel graph={graph} onSelect={onSelect} limit={8} />
       </div>
     </aside>
