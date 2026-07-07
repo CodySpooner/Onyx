@@ -370,13 +370,15 @@ export class ArchiveCityView {
     const cam = this.camera.position
     const tmp = new THREE.Vector3()
     for (const l of this.labels) {
-      if (this.labelsVisible === false) {
-        l.sprite.visible = false
-        continue
-      }
       if (l.fixed) {
+        // district place-names are the map — truly always-on, even with the
+        // global labels toggle off (which is the default config)
         l.sprite.visible = true
         l.sprite.material.opacity = 0.95
+        continue
+      }
+      if (this.labelsVisible === false) {
+        l.sprite.visible = false
         continue
       }
       // skyline stays clean: note names only when the drone drops close

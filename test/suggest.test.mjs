@@ -93,6 +93,16 @@ test('insertWikilink: creates ## Related at EOF; CRLF preserved; idempotent no-o
   assert.equal(insertWikilink(out, 'Target'), out) // already linked → unchanged
 })
 
+test('basename target + title alias: mention wraps as [[file|Title]], Related uses alias', () => {
+  const raw = 'we should check Risk Rules before staking\n'
+  const out = insertWikilink(raw, '03 - Risk Rules', { in: 'x', title: 'Risk Rules' }, 'Risk Rules')
+  assert.ok(out.includes('[[03 - Risk Rules|Risk Rules]]'), out)
+  const out2 = insertWikilink('plain body\n', '03 - Risk Rules', null, 'Risk Rules')
+  assert.ok(out2.includes('- [[03 - Risk Rules|Risk Rules]]'))
+  // already linked by basename → no-op even when alias differs
+  assert.equal(insertWikilink(out, '03 - Risk Rules', null, 'Risk Rules'), out)
+})
+
 test('undo round-trip: keeping the original raw restores exactly', () => {
   const raw = 'a note that mentions Risk Rules today\n'
   const out = insertWikilink(raw, 'Risk Rules', { in: 'x', title: 'Risk Rules' })

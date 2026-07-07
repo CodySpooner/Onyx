@@ -75,18 +75,37 @@ export function buildSuggestions(notes, opts = {}) {
     }
   }
 
-  // title-mention bonus: a's body speaks b's name without linking it
+  // title-mention bonus: a's body speaks b's name without linking it.
+  // Cleaned content and title regexes are memoized — this loop runs per
+  // candidate pair and used to re-regex full note bodies each time.
   const noteById = new Map(notes.map((n) => [n.id, n]))
+  const hayCache = new Map()
+  const hayOf = (id) => {
+    let h = hayCache.get(id)
+    if (h === undefined) {
+      h = contentOf(noteById.get(id)).replace(FENCE_RE, ' ').replace(/\[\[[^\]]*\]\]/g, ' ')
+      hayCache.set(id, h)
+    }
+    return h
+  }
+  const reCache = new Map()
+  const reOf = (title) => {
+    let r = reCache.get(title)
+    if (r === undefined) {
+      r = new RegExp('\\b' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i')
+      reCache.set(title, r)
+    }
+    return r
+  }
   const out = []
   for (const [key, p] of pairScore) {
+    if (p.score + 4 < minScore) continue // even the bonus can't save it
     const [a, b] = key.split('|')
     let mention = null
     for (const [src, dst] of [[a, b], [b, a]]) {
       const title = String(noteById.get(dst)?.title || '')
       if (title.length < 4) continue
-      const hay = contentOf(noteById.get(src)).replace(FENCE_RE, ' ').replace(/\[\[[^\]]*\]\]/g, ' ')
-      const re = new RegExp('\\b' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i')
-      if (re.test(hay)) {
+      if (reOf(title).test(hayOf(src))) {
         p.score += 4
         mention = { in: src, title }
         break
@@ -109,16 +128,21 @@ export function buildSuggestions(notes, opts = {}) {
 }
 
 // The one vault write: wrap the first unlinked whole-word mention, or file
-// the link under ## Related. Returns raw unchanged if [[title]] already there.
-export function insertWikilink(raw, title, mention = null) {
+// the link under ## Related. Returns raw unchanged if [[target]] already there.
+// `target` is the note's FILENAME basename — the only thing wikilinks resolve
+// by (here and in Obsidian). `display` is the pretty frontmatter title; when
+// they differ the link is written as [[target|display]].
+export function insertWikilink(raw, target, mention = null, display = target) {
   const text = String(raw)
   const eol = text.includes('\r\n') ? '\r\n' : '\n'
-  const already = new RegExp('\\[\\[' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(\\|[^\\]]*)?\\]\\]', 'i')
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const already = new RegExp('\\[\\[' + esc(target) + '(\\|[^\\]]*)?\\]\\]', 'i')
   if (already.test(text)) return text
 
   if (mention) {
     const lines = text.split(/\r?\n/)
-    const re = new RegExp('\\b(' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')\\b', 'i')
+    // the prose mentions the TITLE, not the filename
+    const re = new RegExp('\\b(' + esc(display) + ')\\b', 'i')
     let fence = false
     for (let i = 0; i < lines.length; i++) {
       if (/^\s*```/.test(lines[i])) {
@@ -128,19 +152,21 @@ export function insertWikilink(raw, title, mention = null) {
       if (fence || lines[i].includes('[[')) continue
       const m = lines[i].match(re)
       if (m) {
-        lines[i] = lines[i].slice(0, m.index) + '[[' + m[1] + ']]' + lines[i].slice(m.index + m[1].length)
+        const link = m[1].toLowerCase() === target.toLowerCase() ? '[[' + m[1] + ']]' : '[[' + target + '|' + m[1] + ']]'
+        lines[i] = lines[i].slice(0, m.index) + link + lines[i].slice(m.index + m[1].length)
         return lines.join(eol)
       }
     }
     // mention promised but not found in clean text — fall through to Related
   }
 
+  const entry = display.toLowerCase() === target.toLowerCase() ? '- [[' + target + ']]' : '- [[' + target + '|' + display + ']]'
   const relRe = /^## Related[ \t]*$/m
   const m = text.match(relRe)
   if (m) {
     const at = m.index + m[0].length
-    return text.slice(0, at) + eol + '- [[' + title + ']]' + text.slice(at)
+    return text.slice(0, at) + eol + entry + text.slice(at)
   }
   const base = text.endsWith(eol) ? text.slice(0, -eol.length) : text
-  return base + eol + eol + '## Related' + eol + '- [[' + title + ']]' + eol
+  return base + eol + eol + '## Related' + eol + entry + eol
 }

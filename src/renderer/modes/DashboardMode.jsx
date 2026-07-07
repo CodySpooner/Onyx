@@ -276,10 +276,15 @@ export function DashboardMode({ graph, clusters, usage, onSelect, onFilter, sugg
             {suggestions.slice(0, 8).map((s) => {
               const ta = graph.notes.find((n) => n.id === s.a)?.title || s.a
               const tb = graph.notes.find((n) => n.id === s.b)?.title || s.b
+              const target = s.mention?.in || s.a
+              const tTarget = graph.notes.find((n) => n.id === target)?.title || target
               return (
                 <div key={s.a + s.b} className="sg-row">
-                  <button className="bl-title" onClick={() => onAcceptSuggestion?.(s)} title="Insert wikilink (undoable)">
-                    ⧉ {ta} ↔ {tb}
+                  <button className="bl-title" onClick={() => onSelect(s.a)} title="Open note">
+                    {ta} ↔ {tb}
+                  </button>
+                  <button className="sg-link" onClick={() => onAcceptSuggestion?.(s)} title={`Insert wikilink into "${tTarget}" (undoable)`}>
+                    LINK
                   </button>
                   <button className="sg-x" onClick={() => onDismissSuggestion?.(s)} title="Dismiss">
                     ×

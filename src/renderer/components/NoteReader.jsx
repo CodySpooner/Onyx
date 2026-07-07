@@ -60,7 +60,7 @@ function Minimap({ note, graph, clusters, onSelect }) {
   )
 }
 
-function SuggestedLinks({ note, graph, suggestions, onAccept, onDismiss }) {
+function SuggestedLinks({ note, graph, suggestions, onAccept, onDismiss, onSelect }) {
   if (!note) return null
   const mine = suggestions.filter((s) => s.a === note.id || s.b === note.id).slice(0, 5)
   if (!mine.length) return null
@@ -71,12 +71,16 @@ function SuggestedLinks({ note, graph, suggestions, onAccept, onDismiss }) {
       <div className="rule-ticks" />
       {mine.map((s) => {
         const other = s.a === note.id ? s.b : s.a
+        const target = s.mention?.in || s.a
         return (
           <div key={s.a + s.b} className="sg-row">
-            <button className="bl-title" onClick={() => onAccept(s)} title="Insert wikilink (undoable)">
-              ⧉ {titleOf(other)}
+            <button className="bl-title" onClick={() => onSelect(other)} title="Open note">
+              {titleOf(other)}
             </button>
             <span className="sg-terms">{s.terms.slice(0, 3).map((t) => '#' + t).join(' ')}</span>
+            <button className="sg-link" onClick={() => onAccept(s)} title={`Insert wikilink into "${titleOf(target)}" (undoable)`}>
+              LINK
+            </button>
             <button className="sg-x" onClick={() => onDismiss(s)} title="Dismiss suggestion">
               ×
             </button>
@@ -193,8 +197,21 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
     setRaw(null)
     setEditing(false)
     setRenaming(false)
-    window.onyx.readNote(id).then(setRaw)
   }, [id])
+
+  // re-read whenever the note changes ON DISK too (mtime bumps via watcher):
+  // covers suggestion accepts, UNDO restores, and external Obsidian edits —
+  // and never clobbers an in-progress edit
+  useEffect(() => {
+    if (editing) return
+    let dead = false
+    window.onyx.readNote(id).then((r) => {
+      if (!dead) setRaw(r)
+    })
+    return () => {
+      dead = true
+    }
+  }, [id, note?.mtime, editing])
 
   useEffect(() => {
     if (editing) return
@@ -349,7 +366,7 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
       {!editing && raw != null && (
         <>
           <Minimap note={note} graph={graph} clusters={clusters} onSelect={onSelect} />
-          <SuggestedLinks note={note} graph={graph} suggestions={suggestions} onAccept={onAcceptSuggestion} onDismiss={onDismissSuggestion} />
+          <SuggestedLinks note={note} graph={graph} suggestions={suggestions} onAccept={onAcceptSuggestion} onDismiss={onDismissSuggestion} onSelect={onSelect} />
           <Backlinks note={note} graph={graph} onSelect={onSelect} />
         </>
       )}

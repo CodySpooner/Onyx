@@ -89,7 +89,7 @@ export default function App() {
       if (Array.isArray(t?.entries)) setTrail(t.entries)
       trailLoaded.current = true
     })
-    window.onyx.storeGet?.('suggestDismissed').then((d) => {
+    window.onyx.storeGet?.('suggest-dismissed').then((d) => {
       if (Array.isArray(d?.keys)) setDismissed(new Set(d.keys))
     })
   }, [])
@@ -107,15 +107,17 @@ export default function App() {
     })
   }, [graph])
 
-  // one-shot "resume last session" toast
+  // one-shot "resume last session" toast — filter dead entries BEFORE latching,
+  // so a note deleted between sessions can't permanently suppress the toast
   useEffect(() => {
     if (!graph || !trailLoaded.current || resumeShown.current || !trail.length || selected) return
+    const live = new Set(graph.notes.map((n) => n.id))
+    const liveTrail = trail.filter((e) => live.has(e.id))
+    if (!liveTrail.length) return
     resumeShown.current = true
-    const last = trail[trail.length - 1]
-    const title = graph.notes.find((n) => n.id === last.id)?.title
-    if (!title) return
+    const last = liveTrail[liveTrail.length - 1]
     bus.emit('toast', {
-      msg: `◆ last session: ${trail.length} notes`,
+      msg: `◆ last session: ${liveTrail.length} notes`,
       action: { label: 'RESUME', run: () => kbRef.current.openNote?.(last.id) }
     })
   }, [graph, trail])
@@ -224,11 +226,8 @@ export default function App() {
         return
       }
       if (e.altKey && e.key === 'ArrowLeft' && !inInput) {
-        const back = trailBack(k.trail)
-        if (back) {
-          e.preventDefault()
-          kbRef.current.openNote?.(back)
-        }
+        e.preventDefault()
+        kbRef.current.goBack?.()
         return
       }
       if (e.key === 'Escape' && !inInput) {
@@ -291,6 +290,19 @@ export default function App() {
     }
   }
   kbRef.current.openNote = openNote
+  // Alt+Left: a real back-stack. Pop the tail FIRST, then select without a
+  // fresh push — routing through openNote/pushTrail would move-to-end the
+  // target and ping-pong between the last two notes forever.
+  const goBack = () => {
+    const back = trailBack(kbRef.current.trail)
+    if (!back) return
+    if (!guardDirty()) return
+    kbRef.current.dirty = false // discard just confirmed — don't re-ask downstream
+    setTrail((t) => t.slice(0, -1))
+    setSelected(back)
+    setFlyTo((f) => ({ id: back, nonce: (f?.nonce || 0) + 1 }))
+  }
+  kbRef.current.goBack = goBack
   const openDaily = async () => {
     const folder = cfg?.dailyFolder || '06 - Daily Logs'
     const now = new Date()
@@ -352,7 +364,7 @@ export default function App() {
     setDismissed((prev) => {
       const next = new Set(prev)
       next.add(skey(s))
-      window.onyx.storeSet?.('suggestDismissed', { keys: [...next] })
+      window.onyx.storeSet?.('suggest-dismissed', { keys: [...next] })
       return next
     })
   }
@@ -366,7 +378,10 @@ export default function App() {
       bus.emit('toast', { msg: '✕ could not read note — link aborted', kind: 'err' })
       return
     }
-    const next = insertWikilink(raw, titleOf(dst), s.mention)
+    // wikilinks resolve by FILENAME (here and in Obsidian) — link the basename,
+    // carry the pretty title as an alias when they differ
+    const base = dst.split('/').pop().replace(/\.md$/i, '')
+    const next = insertWikilink(raw, base, s.mention, titleOf(dst))
     if (next === raw) {
       dismissSuggestion(s) // already linked by hand — retire the suggestion
       return
@@ -384,8 +399,15 @@ export default function App() {
       action: {
         label: 'UNDO',
         run: async () => {
-          await window.onyx.writeNote(src, raw) // whole-file restore — trivially correct
-          bus.emit('toast', { msg: '↩ link undone' })
+          // compare-and-swap: restore ONLY if the file still holds exactly
+          // what accept wrote — never clobber a newer edit with a stale copy
+          const cur = await window.onyx.readNote(src)
+          if (cur !== next) {
+            bus.emit('toast', { msg: '✕ note changed since link — undo skipped', kind: 'err' })
+            return
+          }
+          const undone = await window.onyx.writeNote(src, raw)
+          bus.emit('toast', undone ? { msg: '↩ link undone' } : { msg: '✕ undo failed — vault not writable', kind: 'err' })
         }
       }
     })
@@ -436,6 +458,9 @@ export default function App() {
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
     { label: 'View: Brain', hint: 'lens', run: () => { setMode('brain'); changeView('brain') } },
+    { label: 'View: Atlas', hint: 'lens', run: () => { setMode('brain'); changeView('atlas') } },
+    { label: 'View: Stacks', hint: 'lens', run: () => { setMode('brain'); changeView('stacks') } },
+    { label: 'View: Archive City', hint: 'lens', run: () => { setMode('brain'); changeView('city') } },
     { label: 'View: Solar System', hint: 'lens', run: () => { setMode('brain'); changeView('solar') } },
     { label: 'View: Core of Everything', hint: 'lens', run: () => { setMode('brain'); changeView('core') } },
     { label: 'View: Second Brain Globe', hint: 'lens', run: () => { setMode('brain'); changeView('globe') } },

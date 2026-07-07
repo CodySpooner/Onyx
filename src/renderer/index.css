@@ -589,7 +589,7 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 }
 
 /* ════════════════ VISTA features: trail · minimap · synapse ════════════════ */
-.trailstrip { position: fixed; left: 50%; transform: translateX(-50%); bottom: 40px; z-index: 9; display: flex; align-items: center; gap: 10px; max-width: 72vw; padding: 6px 12px; border-radius: 10px; }
+.trailstrip { position: fixed; left: 50%; transform: translateX(-50%); bottom: 40px; z-index: 3; display: flex; align-items: center; gap: 10px; max-width: 72vw; padding: 6px 12px; border-radius: 10px; }
 .ts-label { flex: none; }
 .ts-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .ts-chips::-webkit-scrollbar { display: none; }
@@ -621,11 +621,15 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .toast-act { margin-left: 12px; background: rgba(110,168,255,0.1); border: 1px solid var(--brk); border-radius: 6px; color: var(--accent); font: 600 10px/1 var(--font-mono); letter-spacing: 0.1em; padding: 5px 9px; cursor: pointer; }
 .toast-act:hover { background: rgba(110,168,255,0.2); }
 
-/* the note text is the point of the reader: intel rail may not starve it */
-.reader-body { min-height: 200px; }
+/* the note text is the point of the reader: intel rail may not starve it —
+   and on 720px-tall windows the rail must shrink before it overflows */
+.reader-body { min-height: 120px; }
+.minimap { min-height: 0; overflow: hidden; }
 .minimap .mm-svg { max-height: 170px; }
 .backlinks { max-height: 150px; }
 .suggests { max-height: 160px; overflow-y: auto; }
+.sg-link { flex: none; background: rgba(110, 168, 255, 0.1); border: 1px solid var(--brk); border-radius: 5px; color: var(--accent); font: 600 9px/1 var(--font-mono); letter-spacing: 0.1em; padding: 4px 7px; cursor: pointer; }
+.sg-link:hover { background: rgba(110, 168, 255, 0.2); }
 
 /* ARSENAL tab (installed Claude skills) */
 .skills-tabs { display: inline-flex; gap: 18px; }
