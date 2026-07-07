@@ -462,3 +462,18 @@ button:hover { background: #26335c; }
 .bl-title { background: transparent; border: none; padding: 0; color: var(--accent); font-size: 12px; cursor: pointer; text-align: left; }
 .bl-title:hover { text-shadow: 0 0 8px var(--glow); background: transparent; }
 .bl-snippet { color: var(--text-dim); font-size: 11px; line-height: 1.5; margin: 2px 0 0 10px; border-left: 2px solid var(--hairline); padding-left: 8px; }
+
+/* focus mode (B2): only the note remains */
+.app.focus .topbar, .app.focus .foldertabs, .app.focus .hud-body,
+.app.focus .statusbar, .app.focus .hovercard { display: none; }
+.app.focus .stage { filter: brightness(0.22) saturate(0.4) blur(2px); }
+.app.focus .reader { top: 28px; bottom: 28px; left: 50%; right: auto; transform: translateX(-50%); width: 860px; max-width: 92vw; }
+.app.focus .reader.editing { width: 1040px; }
+.sb-pomo { cursor: pointer; background: transparent; border: none; border-left: 1px solid var(--hairline); border-radius: 0; color: var(--text-faint); font: inherit; letter-spacing: inherit; }
+.sb-pomo:hover { color: var(--text-dim); background: transparent; }
+.sb-pomo.on { color: var(--warn); padding: 0; }
+.sb-pomo.on.break { color: var(--ok); }
+.sb-pomo-main { background: transparent; border: none; color: inherit; font: inherit; letter-spacing: inherit; cursor: pointer; padding: 0 4px 0 14px; }
+.sb-pomo-main:hover { background: transparent; }
+.sb-pomo-x { background: transparent; border: none; color: var(--text-faint); cursor: pointer; font: inherit; padding: 0 10px 0 4px; }
+.sb-pomo-x:hover { color: var(--err); background: transparent; }

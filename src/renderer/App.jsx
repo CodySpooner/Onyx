@@ -38,6 +38,7 @@ export default function App() {
   const [cfg, setCfg] = useState(null)
   const [booting, setBooting] = useState(true)
   const [bootTimedOut, setBootTimedOut] = useState(false)
+  const [focusMode, setFocusMode] = useState(false)
   const [pins, setPins] = useState([])
   const [flyTo, setFlyTo] = useState(null)
   const lastOpened = useRef(null)
@@ -120,7 +121,7 @@ export default function App() {
   // keyboard contract — one listener; handler reads fresh state via ref
   // (merge-assign: callbacks like openDaily and the dirty flag must survive renders)
   const kbRef = useRef({})
-  Object.assign(kbRef.current, { overlay, selected, mode })
+  Object.assign(kbRef.current, { overlay, selected, mode, focusMode })
   useEffect(() => {
     const onKey = (e) => {
       const k = kbRef.current
@@ -145,8 +146,14 @@ export default function App() {
         setMode(['brain', 'dashboard', 'skills'][+e.key - 1])
         return
       }
+      if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.altKey && !e.metaKey && !inInput && k.selected) {
+        e.preventDefault()
+        setFocusMode((f) => !f)
+        return
+      }
       if (e.key === 'Escape' && !inInput) {
         if (k.overlay) setOverlay(null)
+        else if (k.focusMode) setFocusMode(false)
         else if (k.selected) {
           if (!k.dirty || window.confirm('Discard unsaved edits?')) setSelected(null)
         } else bus.emit('hover', null)
@@ -263,6 +270,7 @@ export default function App() {
     { label: 'View: Constellation', hint: 'lens', run: () => { setMode('brain'); changeView('constellation') } },
     { label: 'Mode: Dashboard', hint: 'Ctrl+2', run: () => setMode('dashboard') },
     { label: 'Mode: Skills', hint: 'Ctrl+3', run: () => setMode('skills') },
+    ...(selected ? [{ label: 'Toggle focus mode', hint: 'F', run: () => setFocusMode((f) => !f) }] : []),
     { label: 'Toggle synapses', hint: 'links', run: toggleLinks },
     { label: 'Toggle labels', hint: 'labels', run: toggleLabels },
     ...(filtering ? [{ label: 'Clear filters', hint: 'reset', run: () => setFilter(EMPTY_FILTER) }] : []),
@@ -271,7 +279,7 @@ export default function App() {
   ]
 
   return (
-    <div className="app hud">
+    <div className={`app hud${focusMode && selected ? ' focus' : ''}`}>
       {graph && graph.notes.length > 0 && (
         <>
       <div className={`stage ${mode !== 'brain' ? 'dimmed' : ''}`}>
@@ -372,6 +380,7 @@ export default function App() {
         clusterCount={clusters.clusterCount}
         vaultPath={cfg?.vaultPath || ''}
         onPickVault={() => window.onyx.pickVault().then(setGraph)}
+        onPomodoroDone={() => window.onyx.bumpUsage?.('pomodorosCompleted').then(setUsage)}
       />
       <Toasts />
       <div className="scanlines" aria-hidden />

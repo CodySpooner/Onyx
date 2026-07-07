@@ -11,7 +11,10 @@ const DEFAULTS = {
   showAllLinks: true,
   showLabels: false,
   pins: [],
-  dailyFolder: '06 - Daily Logs'
+  dailyFolder: '06 - Daily Logs',
+  pomodoroWork: 25,
+  pomodoroBreak: 5,
+  pomodoroSound: true
 }
 
 const file = () => path.join(app.getPath('userData'), 'onyx-config.json')

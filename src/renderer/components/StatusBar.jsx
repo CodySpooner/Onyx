@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { shortPath, emaFps, fpsTier } from '../lib/hud.mjs'
 import { Num } from './chrome.jsx'
+import { Pomodoro } from './Pomodoro.jsx'
 
 // FPS: one rAF loop writing DIRECTLY to the DOM node at 2Hz — no setState
 // per frame, keeps measuring even while the brain canvas is paused.
@@ -39,7 +40,7 @@ function Clock() {
   return <span className="num">{`${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`}</span>
 }
 
-export function StatusBar({ graph, clusterCount, vaultPath, onPickVault }) {
+export function StatusBar({ graph, clusterCount, vaultPath, onPickVault, onPomodoroDone }) {
   const fpsRef = useRef(null)
   useFps(fpsRef)
 
@@ -78,6 +79,7 @@ export function StatusBar({ graph, clusterCount, vaultPath, onPickVault }) {
         <Num value={clusterCount ?? 0} /> C
       </span>
       <span className="sb-spacer" />
+      <Pomodoro onCompleted={onPomodoroDone} />
       <span className="sb-seg num" ref={fpsRef} data-tier="ok">
         — FPS
       </span>
