@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Gauge } from './Gauge.jsx'
-import { degree, cleanFolder } from '../lib/stats.js'
+import { degree, cleanFolder } from '../lib/stats.mjs'
 
 const uniq = (a) => [...new Set(a.filter(Boolean))].sort()
 

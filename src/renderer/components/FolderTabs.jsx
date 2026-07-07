@@ -1,4 +1,4 @@
-import { cleanFolder } from '../lib/stats.js'
+import { cleanFolder } from '../lib/stats.mjs'
 
 export function FolderTabs({ graph, filter, onChange }) {
   const active = filter.folders[0] || null

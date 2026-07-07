@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { matchFilter } from './lib/graph.mjs'
-import { vaultStats } from './lib/stats.js'
+import { vaultStats } from './lib/stats.mjs'
 import { SpaceCanvas } from './views/SpaceCanvas.jsx'
 import { ViewSwitcher } from './views/ViewSwitcher.jsx'
 import { NoteReader } from './components/NoteReader.jsx'
