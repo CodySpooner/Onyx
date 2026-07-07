@@ -13,7 +13,7 @@ function Spark({ weeks }) {
   )
 }
 
-export function Cockpit({ graph, clusters, onSelect }) {
+export function Cockpit({ graph, clusters, onSelect, onUsage }) {
   const d = useMemo(() => {
     const now = Date.now()
     const { clusterOf, clusterCount } = clusters ?? detectClusters(graph.notes.map((n) => n.id), graph.links)
@@ -65,7 +65,14 @@ export function Cockpit({ graph, clusters, onSelect }) {
         <div className="glass cpanel">
           <div className="sec-h">COLD NOTES ›60D</div>
           {d.cold.slice(0, 5).map((c) => (
-            <button key={c.note.id} className="cp-item" onClick={() => onSelect(c.note.id)}>
+            <button
+              key={c.note.id}
+              className="cp-item"
+              onClick={() => {
+                onUsage?.('coldRevisit')
+                onSelect(c.note.id)
+              }}
+            >
               <span className="cp-t">{c.note.title}</span>
               <span className="cp-v">{c.ageDays}d</span>
             </button>
@@ -76,7 +83,14 @@ export function Cockpit({ graph, clusters, onSelect }) {
       <div className="glass cpanel">
         <div className="sec-h">BRIDGES · {d.br.count}</div>
         {d.br.top.slice(0, 3).map((t) => (
-          <button key={t.id} className="cp-item" onClick={() => onSelect(t.id)}>
+          <button
+            key={t.id}
+            className="cp-item"
+            onClick={() => {
+              onUsage?.('bridgeInspect')
+              onSelect(t.id)
+            }}
+          >
             <span className="cp-t">{titleOf(t.id)}</span>
             <span className="cp-v">{t.cross}⇄</span>
           </button>

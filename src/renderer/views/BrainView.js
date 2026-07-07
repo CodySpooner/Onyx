@@ -149,6 +149,12 @@ export class BrainView {
     this.labelsVisible = show !== false
   }
 
+  // public: fly the camera to a note (command palette "fly to thought")
+  focus(id) {
+    const rec = this.byId.get(id)
+    if (rec) this._flyTo(rec.mesh.position)
+  }
+
   _setHover(id) {
     if (id === this.hoverId) return
     this.hoverId = id

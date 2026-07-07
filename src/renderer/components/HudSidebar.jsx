@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
 import { Gauge } from './Gauge.jsx'
+import { TasksPanel } from './TasksPanel.jsx'
 import { degree, cleanFolder } from '../lib/stats.mjs'
 
 const uniq = (a) => [...new Set(a.filter(Boolean))].sort()
 
-export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate }) {
+export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect, onCreate, onOpenDaily, pins = [] }) {
   const facets = useMemo(
     () => ({
       types: uniq(graph.notes.map((n) => n.type)),
@@ -26,14 +27,35 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
 
       <input
         className="hud-search"
-        placeholder="SEARCH…"
+        placeholder="FILTER…"
         value={filter.q}
         onChange={(e) => onFilter({ ...filter, q: e.target.value })}
       />
 
-      <button className="hud-new" onClick={onCreate}>
-        ＋ New note
-      </button>
+      <div className="hud-btnrow">
+        <button className="hud-new" onClick={onCreate}>
+          ＋ New note
+        </button>
+        <button className="hud-new" onClick={onOpenDaily}>
+          ◐ Today
+        </button>
+      </div>
+
+      {pins.length > 0 && (
+        <div className="hud-sec">
+          <div className="sec-h">PINNED</div>
+          {pins
+            .map((id) => graph.notes.find((n) => n.id === id))
+            .filter(Boolean)
+            .map((n) => (
+              <button key={n.id} className="hubrow" onClick={() => onSelect(n.id)}>
+                <i style={{ background: colorOf(n.folder) }} />
+                <span className="hub-t">{n.title}</span>
+                <span className="hub-d">◉</span>
+              </button>
+            ))}
+        </div>
+      )}
 
       <div className="hud-sec vitals">
         <Gauge value={stats.connectedPct} label="LINKED" />
@@ -112,6 +134,11 @@ export function HudSidebar({ graph, stats, filter, onFilter, featured, onSelect,
             <span className="hub-d">{degree(n)}</span>
           </button>
         ))}
+      </div>
+
+      <div className="hud-sec">
+        <div className="sec-h">TASKS</div>
+        <TasksPanel graph={graph} onSelect={onSelect} limit={8} />
       </div>
     </aside>
   )

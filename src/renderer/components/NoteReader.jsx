@@ -19,7 +19,7 @@ function renderBody(raw, basenameToId) {
   return md.render(withLinks)
 }
 
-export function NoteReader({ id, graph, onSelect, onClose }) {
+export function NoteReader({ id, graph, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage }) {
   const [raw, setRaw] = useState(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -72,6 +72,7 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
     if (ok) {
       setRaw(draft)
       setEditing(false)
+      onUsage?.('noteEdit')
     } else {
       alert('Could not save the note.')
     }
@@ -79,8 +80,10 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
   const del = async () => {
     if (!window.confirm(`Delete "${note?.title || id}"? This removes the file from your vault.`)) return
     const ok = await window.onyx.deleteNote(id)
-    if (ok) onClose()
-    else alert('Could not delete the note.')
+    if (ok) {
+      onUsage?.('noteDelete')
+      onClose()
+    } else alert('Could not delete the note.')
   }
   const startRename = () => {
     setRenameVal(note?.title || id.split('/').pop().replace(/\.md$/, ''))
@@ -89,8 +92,11 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
   const doRename = async () => {
     const nid = await window.onyx.renameNote(id, renameVal)
     setRenaming(false)
-    if (nid && nid !== id) onSelect(nid)
-    else if (!nid) alert('Rename failed — the name may already be taken.')
+    if (nid && nid !== id) {
+      onRenamed?.(id, nid)
+      onUsage?.('noteRename')
+      onSelect(nid)
+    } else if (!nid) alert('Rename failed — the name may already be taken.')
   }
 
   return (
@@ -124,6 +130,9 @@ export function NoteReader({ id, graph, onSelect, onClose }) {
           </div>
         </div>
         <div className="reader-actions">
+          <button onClick={onTogglePin} className={pinned ? 'pin on' : 'pin'} title={pinned ? 'Unpin' : 'Pin'}>
+            {pinned ? '◉' : '⊙'}
+          </button>
           {!editing && raw != null && (
             <button onClick={startEdit} title="Edit note">✎</button>
           )}

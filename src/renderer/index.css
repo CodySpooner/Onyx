@@ -418,3 +418,31 @@ button:hover { background: #26335c; }
 .sk-part-label { color: var(--text-faint); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
 .sk-part-val { color: var(--text-dim); font-size: 10px; }
 .sk-gate { margin-top: 9px; border-top: 1px solid var(--border); padding-top: 8px; color: #f72585; font-size: 10px; letter-spacing: 0.06em; }
+
+/* ── tools (C4) ─────────────────────────────────────────────── */
+.veil { position: fixed; inset: 0; z-index: 30; background: rgba(5, 6, 10, 0.55); }
+.palette { position: absolute; left: 50%; top: 16vh; transform: translateX(-50%); width: 560px; display: flex; flex-direction: column; overflow: hidden; }
+.palette-input { background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 15px 18px; color: var(--text); font-size: 14px; outline: none; }
+.palette-input::placeholder { color: var(--text-faint); }
+.palette-list { max-height: 48vh; overflow-y: auto; padding: 6px; }
+.palette-sec { padding: 8px 12px 4px; }
+.palette-row { display: flex; align-items: baseline; gap: 10px; width: 100%; background: transparent; border: none; border-radius: 8px; padding: 8px 12px; cursor: pointer; text-align: left; }
+.palette-row.sel { background: rgba(110, 168, 255, 0.10); }
+.palette-row:hover { background: rgba(110, 168, 255, 0.06); }
+.palette-label { color: var(--text); font-size: 13px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-label mark { background: none; color: var(--accent); font-weight: 650; }
+.palette-hint { color: var(--text-faint); font-size: 10px; letter-spacing: 0.06em; flex: none; }
+.palette-empty { padding: 18px; color: var(--text-faint); font-size: 12px; text-align: center; }
+.palette-foot { border-top: 1px solid var(--border); padding: 8px 14px; color: var(--text-faint); font-size: 10px; display: flex; gap: 6px; align-items: center; }
+
+.capture { position: absolute; left: 50%; top: 30vh; transform: translateX(-50%); width: 440px; padding: 6px 6px 10px; transition: box-shadow 0.2s var(--ease-out); }
+.capture.flash { box-shadow: 0 0 0 1px var(--ok), 0 16px 48px rgba(0, 0, 0, 0.5); }
+.capture-input { width: 100%; background: transparent; border: none; padding: 13px 14px; color: var(--text); font-size: 14px; outline: none; }
+.capture-input::placeholder { color: var(--text-faint); }
+.capture-foot { padding: 0 14px; }
+.capture.flash .capture-foot { color: var(--ok); }
+
+.hud-btnrow { display: flex; gap: 8px; }
+.hud-btnrow .hud-new { flex: 1; }
+.reader-actions .pin { color: #7c8ab5; }
+.reader-actions .pin.on { color: var(--warn); border-color: rgba(255, 209, 102, 0.4); }

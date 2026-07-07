@@ -7,7 +7,7 @@ import { BrainView } from './BrainView.js'
 
 const VIEWS = { brain: BrainView, solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
 
-export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0, paused = false }) {
+export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0, paused = false, focus = null }) {
   const ref = useRef(null)
   const inst = useRef(null)
 
@@ -46,6 +46,10 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAll
   useEffect(() => {
     inst.current?.setPaused?.(paused)
   }, [paused])
+
+  useEffect(() => {
+    if (focus?.id) inst.current?.focus?.(focus.id)
+  }, [focus])
 
   return <div className="canvas" ref={ref} />
 }

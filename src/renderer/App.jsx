@@ -18,6 +18,9 @@ import { HoverLayer } from './components/HoverLayer.jsx'
 import { BootSequence } from './components/BootSequence.jsx'
 import { DashboardMode } from './modes/DashboardMode.jsx'
 import { SkillsMode } from './modes/SkillsMode.jsx'
+import { CommandPalette } from './components/CommandPalette.jsx'
+import { QuickCapture } from './components/QuickCapture.jsx'
+import { dailyId, dailyTemplate, appendCapture } from './lib/daily.mjs'
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
 
@@ -34,6 +37,9 @@ export default function App() {
   const [usage, setUsage] = useState(null)
   const [cfg, setCfg] = useState(null)
   const [booting, setBooting] = useState(true)
+  const [pins, setPins] = useState([])
+  const [flyTo, setFlyTo] = useState(null)
+  const lastOpened = useRef(null)
 
   useEffect(() => {
     window.onyx.getGraph().then(setGraph)
@@ -45,9 +51,17 @@ export default function App() {
       setCfg(c)
       setShowAllLinks(c.showAllLinks)
       setShowLabels(c.showLabels)
+      setPins(Array.isArray(c.pins) ? c.pins : [])
     })
     window.onyx.getUsage?.().then(setUsage)
   }, [])
+
+  // debounced search counter (Explorer branch fuel)
+  useEffect(() => {
+    if (!filter.q) return
+    const t = setTimeout(() => window.onyx.bumpUsage?.('search').then(setUsage), 1000)
+    return () => clearTimeout(t)
+  }, [filter.q])
 
   // ponytail: verification hook so automated screenshots can drive the UI
   useEffect(() => {
@@ -97,6 +111,16 @@ export default function App() {
       if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault()
         setOverlay((o) => (o === 'palette' ? null : 'palette'))
+        return
+      }
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault()
+        kbRef.current.openDaily?.()
+        return
+      }
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault()
+        setOverlay('capture')
         return
       }
       if (e.ctrlKey && ['1', '2', '3'].includes(e.key)) {
@@ -155,6 +179,71 @@ export default function App() {
     setView(v)
     window.onyx.bumpUsage?.(`view.${v}`).then(setUsage)
   }
+  const openNote = (id) => {
+    setSelected(id)
+    setFlyTo((f) => ({ id, nonce: (f?.nonce || 0) + 1 }))
+    if (id && lastOpened.current !== id) {
+      lastOpened.current = id
+      window.onyx.bumpUsage?.('noteOpen').then(setUsage)
+    }
+  }
+  const openDaily = async () => {
+    const folder = cfg?.dailyFolder || '06 - Daily Logs'
+    const now = new Date()
+    const id = dailyId(now, folder)
+    const res = await window.onyx.ensureNote?.(id, dailyTemplate(now))
+    if (res?.created) setGraph(await window.onyx.getGraph())
+    openNote(id)
+    window.onyx.bumpUsage?.('dailyOpen').then(setUsage)
+  }
+  kbRef.current.openDaily = openDaily
+  const handleCapture = async (text) => {
+    const folder = cfg?.dailyFolder || '06 - Daily Logs'
+    const now = new Date()
+    const id = dailyId(now, folder)
+    await window.onyx.ensureNote?.(id, dailyTemplate(now))
+    const raw = (await window.onyx.readNote(id)) ?? dailyTemplate(now)
+    await window.onyx.writeNote(id, appendCapture(raw, text, now))
+    window.onyx.bumpUsage?.('captureSave').then(setUsage)
+    bus.emit('toast', { msg: `◆ captured to ${id.split('/').pop()}`, kind: 'info', ttl: 2200 })
+  }
+  const togglePin = (id) => {
+    if (!id) return
+    const adding = !pins.includes(id)
+    const next = adding ? [...pins, id] : pins.filter((p) => p !== id)
+    setPins(next)
+    window.onyx.setConfig({ pins: next })
+    if (adding) window.onyx.bumpUsage?.('pinAdd').then(setUsage)
+  }
+  const handleRenamed = (oldId, newId) => {
+    if (pins.includes(oldId)) {
+      const next = pins.map((p) => (p === oldId ? newId : p))
+      setPins(next)
+      window.onyx.setConfig({ pins: next })
+    }
+    lastOpened.current = newId
+  }
+
+  const actions = [
+    { label: 'New note', hint: 'create in active folder', run: handleCreate },
+    { label: "Open today's daily note", hint: 'Ctrl+D', run: openDaily },
+    { label: 'Quick capture', hint: 'Ctrl+Shift+N', run: () => setOverlay('capture') },
+    ...(selected
+      ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
+      : []),
+    { label: 'View: Brain', hint: 'lens', run: () => { setMode('brain'); changeView('brain') } },
+    { label: 'View: Solar System', hint: 'lens', run: () => { setMode('brain'); changeView('solar') } },
+    { label: 'View: Core of Everything', hint: 'lens', run: () => { setMode('brain'); changeView('core') } },
+    { label: 'View: Second Brain Globe', hint: 'lens', run: () => { setMode('brain'); changeView('globe') } },
+    { label: 'View: Constellation', hint: 'lens', run: () => { setMode('brain'); changeView('constellation') } },
+    { label: 'Mode: Dashboard', hint: 'Ctrl+2', run: () => setMode('dashboard') },
+    { label: 'Mode: Skills', hint: 'Ctrl+3', run: () => setMode('skills') },
+    { label: 'Toggle synapses', hint: 'links', run: toggleLinks },
+    { label: 'Toggle labels', hint: 'labels', run: toggleLabels },
+    ...(filtering ? [{ label: 'Clear filters', hint: 'reset', run: () => setFilter(EMPTY_FILTER) }] : []),
+    { label: 'Reset camera', hint: 'view', run: () => setResetNonce((n) => n + 1) },
+    { label: 'Change vault…', hint: 'system', run: () => window.onyx.pickVault().then(setGraph) }
+  ]
 
   return (
     <div className="app hud">
@@ -169,6 +258,7 @@ export default function App() {
           showLabels={showLabels}
           resetNonce={resetNonce}
           paused={mode !== 'brain'}
+          focus={flyTo}
         />
       </div>
       <TopBar
@@ -189,11 +279,18 @@ export default function App() {
               filter={filter}
               onFilter={setFilter}
               featured={featured}
-              onSelect={setSelected}
+              onSelect={openNote}
               onCreate={handleCreate}
+              onOpenDaily={openDaily}
+              pins={pins}
             />
             <div className="hud-spacer" />
-            <Cockpit graph={graph} clusters={clusters} onSelect={setSelected} />
+            <Cockpit
+              graph={graph}
+              clusters={clusters}
+              onSelect={openNote}
+              onUsage={(n) => window.onyx.bumpUsage?.(n).then(setUsage)}
+            />
             <HudToolbar
               showAllLinks={showAllLinks}
               onLinks={toggleLinks}
@@ -218,8 +315,27 @@ export default function App() {
         />
       )}
       {mode === 'skills' && evaluated && <SkillsMode evaluated={evaluated} />}
+      {overlay === 'palette' && (
+        <CommandPalette graph={graph} actions={actions} onSelectNote={openNote} onClose={() => setOverlay(null)} />
+      )}
+      {overlay === 'capture' && (
+        <QuickCapture
+          targetLabel={dailyId(new Date(), cfg?.dailyFolder || '06 - Daily Logs')}
+          onCapture={handleCapture}
+          onClose={() => setOverlay(null)}
+        />
+      )}
       {selected && (
-        <NoteReader id={selected} graph={graph} onSelect={setSelected} onClose={() => setSelected(null)} />
+        <NoteReader
+          id={selected}
+          graph={graph}
+          onSelect={openNote}
+          onClose={() => setSelected(null)}
+          pinned={pins.includes(selected)}
+          onTogglePin={() => togglePin(selected)}
+          onRenamed={handleRenamed}
+          onUsage={(name) => window.onyx.bumpUsage?.(name).then(setUsage)}
+        />
       )}
       <StatusBar
         graph={graph}
