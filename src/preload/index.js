@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('onyx', {
   getSnapshots: () => ipcRenderer.invoke('snapshots:get'),
   storeGet: (name) => ipcRenderer.invoke('store:get', name),
   storeSet: (name, data) => ipcRenderer.invoke('store:set', name, data),
+  openExternal: (url) => ipcRenderer.invoke('shell:openExternal', url),
   ensureNote: (rel, content) => ipcRenderer.invoke('vault:ensureNote', rel, content),
   onUpdate: (cb) => {
     const h = (_e, s) => cb(s)

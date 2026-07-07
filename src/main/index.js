@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
@@ -158,6 +158,17 @@ ipcMain.handle('usage:markUnlocked', (_e, ids) => markUnlocked(ids))
 ipcMain.handle('snapshots:get', () => loadSnapshots().days)
 ipcMain.handle('store:get', (_e, name) => storeGet(name))
 ipcMain.handle('store:set', (_e, name, data) => storeSet(name, data))
+ipcMain.handle('shell:openExternal', (_e, url) => {
+  // trust boundary lives in MAIN: only http(s) ever leaves the app
+  try {
+    const u = new URL(String(url))
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false
+    shell.openExternal(u.href)
+    return true
+  } catch {
+    return false
+  }
+})
 ipcMain.handle('vault:ensureNote', async (_e, rel, content) => {
   const { vaultPath } = loadConfig()
   try {

@@ -76,6 +76,8 @@ export async function scanVault(vaultPath) {
       status: data.status ?? null,
       tags: noteTags,
       updated: data.updated instanceof Date ? data.updated.toISOString().slice(0, 10) : (data.updated ?? null),
+      url: data.url ? String(data.url) : null,
+      read: data.read === true,
       mtime: mtime ?? (Number.isFinite(Date.parse(data.updated)) ? Date.parse(data.updated) : Date.now()),
       wordCount: content.split(/\s+/).filter(Boolean).length,
       tasks: parseTasks(raw, rel),
