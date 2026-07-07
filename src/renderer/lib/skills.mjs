@@ -193,7 +193,8 @@ export function evaluateSkills(stats) {
     20 * (stats.bestStreak || 0) +
     2 * Math.min(c.search || 0, 200) +
     5 * (c.noteCreate || 0) +
-    50 * unlockedCount
+    50 * unlockedCount +
+    (stats.questBonusXp || 0)
   const level = levelFromXp(xp)
   const span = xpForLevel(level + 1) - xpForLevel(level)
   const levelPct = span > 0 ? (xp - xpForLevel(level)) / span : 0

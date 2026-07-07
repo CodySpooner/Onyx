@@ -25,6 +25,7 @@ import { findTemplateFolder, applyTemplate } from './lib/templates.mjs'
 import { dueCards, grade, prune } from './lib/srs.mjs'
 import { ReviewModal } from './components/ReviewModal.jsx'
 import { pushTrail, pruneTrail, trailBack } from './lib/trail.mjs'
+import { tickQuests, reroll as rerollQuest } from './lib/quests.mjs'
 import { insertWikilink, triageQueue } from './lib/suggest.mjs'
 import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
@@ -62,6 +63,8 @@ export default function App() {
   const [dismissed, setDismissed] = useState(() => new Set())
   const [triageRows, setTriageRows] = useState([])
   const [pendingTasks, setPendingTasks] = useState(() => new Set())
+  const [quests, setQuests] = useState(null)
+  const questsLoaded = useRef(false)
   const lastOpened = useRef(null)
   const announced = useRef(new Set()) // unlock toasts already shown this session
 
@@ -97,7 +100,32 @@ export default function App() {
     window.onyx.storeGet?.('suggest-dismissed').then((d) => {
       if (Array.isArray(d?.keys)) setDismissed(new Set(d.keys))
     })
+    window.onyx.storeGet?.('quests').then((qs) => {
+      setQuests(qs || null)
+      questsLoaded.current = true
+    })
   }, [])
+
+  // quests tick on every usage change: rollover, latch completions, award XP
+  useEffect(() => {
+    if (!questsLoaded.current || !usage) return
+    setQuests((prev) => {
+      const { state, completed, changed } = tickQuests(prev, usage, Date.now())
+      if (completed.length) {
+        for (const q of completed) bus.emit('toast', { msg: `◆ quest complete: ${q.label} · +${q.xp} XP`, kind: 'skill' })
+      }
+      if (changed) window.onyx.storeSet?.('quests', state)
+      return changed ? state : prev
+    })
+  }, [usage])
+
+  const rerollDaily = (questId) => {
+    setQuests((prev) => {
+      const { state, changed } = rerollQuest(prev, usage, questId, Date.now())
+      if (changed) window.onyx.storeSet?.('quests', state)
+      return changed ? state : prev
+    })
+  }
 
   // trail persistence + pruning against live notes
   useEffect(() => {
@@ -177,8 +205,8 @@ export default function App() {
   // expensive graph-only half memoized on [graph]; cheap usage merge per bump
   const graphSkillStats = useMemo(() => (graph ? buildGraphSkillStats(graph, Date.now()) : null), [graph])
   const evaluated = useMemo(
-    () => (graphSkillStats ? evaluateSkills(mergeUsageStats(graphSkillStats, usage, Date.now())) : null),
-    [graphSkillStats, usage]
+    () => (graphSkillStats ? evaluateSkills({ ...mergeUsageStats(graphSkillStats, usage, Date.now()), questBonusXp: quests?.bonusXp || 0 }) : null),
+    [graphSkillStats, usage, quests]
   )
 
   // unlock-diff: toast + persist newly unlocked skills (announced ref makes
@@ -676,7 +704,9 @@ export default function App() {
           dailyFolder={cfg?.dailyFolder || '06 - Daily Logs'}
         />
       )}
-      {mode === 'skills' && evaluated && <SkillsMode evaluated={evaluated} />}
+      {mode === 'skills' && evaluated && (
+        <SkillsMode evaluated={evaluated} quests={quests} usage={usage} onReroll={rerollDaily} />
+      )}
       {overlay === 'palette' && (
         <CommandPalette graph={graph} actions={actions} onSelectNote={openNote} onClose={() => setOverlay(null)} />
       )}

@@ -802,3 +802,25 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .lm-cell { cursor: pointer; }
 .lm-cell:hover { stroke: var(--accent); stroke-width: 1; }
 .dup-group { margin-bottom: 8px; }
+
+/* ── skills: zoom stage, quests, detail panel ── */
+.skills-stage { flex: 1; min-height: 0; display: flex; }
+.skills-stage .skills-svg { flex: 1; }
+.quests-wrap { display: flex; gap: 20px; justify-content: center; padding: 30px 40px; flex-wrap: wrap; }
+.quests-col { width: 380px; max-width: 90vw; display: flex; flex-direction: column; gap: 10px; }
+.quest { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.quest.done { opacity: 0.65; }
+.q-top { display: flex; align-items: baseline; gap: 10px; }
+.q-label { flex: 1; color: var(--text); font-size: 12px; font-weight: 600; }
+.q-xp { color: var(--warn); font-size: 10px; }
+.q-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.q-row .bar { flex: 1; }
+.q-val { color: var(--text-faint); font-size: 10px; }
+.q-reroll { background: transparent; border: none; color: var(--text-faint); cursor: pointer; font-size: 13px; padding: 0 2px; position: relative; }
+.q-reroll:hover { color: var(--accent); }
+.quest-total { margin-top: 8px; text-align: right; }
+.skdetail { position: fixed; right: 26px; top: 120px; width: 300px; z-index: 6; border-radius: 12px; padding: 16px 18px; max-height: 70vh; overflow-y: auto; }
+.skd-close { position: absolute; top: 8px; right: 10px; background: transparent; border: none; color: var(--text-faint); cursor: pointer; }
+.skd-close:hover { color: var(--text); }
+.skd-sec { margin-top: 12px; margin-bottom: 5px; }
+.skd-text { color: var(--text-dim); font-size: 11.5px; line-height: 1.6; }

@@ -3,10 +3,22 @@ import { hashAngle } from '../lib/graph.mjs'
 import { BRANCH_COLORS } from '../lib/skills.mjs'
 import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { arsenalLayout, displayName } from '../lib/installed-skills.mjs'
+import { questValue } from '../lib/quests.mjs'
 
 const BRANCH_ORDER = ['INTELLIGENCE', 'MEMORY', 'ARCHITECT', 'CARTOGRAPHER', 'RITUALIST', 'CURATOR', 'EXPLORER']
 const ROMAN = ['I', 'II', 'III', 'IV', 'V']
 const DORMANT = '#565f7d'
+
+// what each branch is FOR — shown in the click-detail panel
+const BRANCH_USES = {
+  MEMORY: 'Raw capture volume. Every note and word you bank grows this branch — use it to gauge whether the vault is actually absorbing your research.',
+  ARCHITECT: 'Connection density. Grows when you wire notes together with [[wikilinks]] — the difference between a pile of files and a brain.',
+  CARTOGRAPHER: 'Structure awareness. Clusters and bridge notes — use it to see whether your betting systems form real territories or one blob.',
+  RITUALIST: 'Consistency. Streaks and daily habits — the compounding-interest branch.',
+  CURATOR: 'Maintenance. Reviews, triage, pruning — keeps the brain trustworthy.',
+  EXPLORER: 'Navigation. Searching, hopping views, revisiting cold notes — how well you traverse what you built.',
+  INTELLIGENCE: 'AI enrichment. Activates when a Claude API key is connected — summaries, ghost links, chat over the vault.'
+}
 
 function polar(angleDeg, r) {
   const a = (angleDeg * Math.PI) / 180
@@ -14,7 +26,7 @@ function polar(angleDeg, r) {
 }
 
 // The machine's real installed Claude skills, as a constellation of their own.
-function Arsenal({ arsenal, onHover }) {
+function Arsenal({ arsenal, onHover, onDetail, viewBox }) {
   const layout = useMemo(() => {
     if (!arsenal?.skills?.length) return null
     const groups = new Map()
@@ -55,7 +67,7 @@ function Arsenal({ arsenal, onHover }) {
   }
 
   return (
-    <svg className="skills-svg" viewBox="-620 -540 1240 1080">
+    <svg className="skills-svg" viewBox={viewBox || '-620 -540 1240 1080'}>
       {layout.edges.map((e) => {
         const col = layout.colorOf.get(e.to.skill.group)
         return (
@@ -82,6 +94,7 @@ function Arsenal({ arsenal, onHover }) {
             className="st-node unlocked"
             onMouseEnter={(e) => onHover({ arsenalSkill: p.skill, color: col, x: e.clientX, y: e.clientY })}
             onMouseLeave={() => onHover(null)}
+            onClick={() => onDetail?.(p.skill, col)}
           >
             <circle r="13" fill={col} opacity="0.14" />
             <circle r="7" fill={col} stroke={col} />
@@ -103,13 +116,24 @@ function Arsenal({ arsenal, onHover }) {
   )
 }
 
-export function SkillsMode({ evaluated }) {
+export function SkillsMode({ evaluated, quests, usage, onReroll }) {
   const [hover, setHover] = useState(null) // { skill | arsenalSkill, x, y }
   const [tab, setTab] = useState('cortex')
   const [arsenal, setArsenal] = useState(null)
+  const [detail, setDetail] = useState(null) // { skill } | { arsenalSkill, color }
+  const [zoom, setZoom] = useState(1)
+  // live ARSENAL: rescan on mount, on tab switch, and every 60s — newly
+  // installed Claude skills appear without restarting Onyx
   useEffect(() => {
-    window.onyx.getInstalledSkills?.().then(setArsenal)
-  }, [])
+    const scan = () => window.onyx.getInstalledSkills?.().then(setArsenal)
+    scan()
+    const t = setInterval(scan, 60000)
+    return () => clearInterval(t)
+  }, [tab])
+  const onWheel = (e) => {
+    setZoom((z) => Math.max(0.45, Math.min(2.4, e.deltaY > 0 ? z * 1.12 : z / 1.12)))
+  }
+  const viewBox = `${-620 * zoom} ${-540 * zoom} ${1240 * zoom} ${1080 * zoom}`
   const layout = useMemo(() => {
     const nodes = new Map()
     for (const s of evaluated.skills) {
@@ -154,6 +178,9 @@ export function SkillsMode({ evaluated }) {
           <button className={`u-label sk-tab${tab === 'arsenal' ? ' on' : ''}`} onClick={() => setTab('arsenal')}>
             ARSENAL{arsenal?.skills?.length ? ` · ${arsenal.skills.length}` : ''}
           </button>
+          <button className={`u-label sk-tab${tab === 'quests' ? ' on' : ''}`} onClick={() => setTab('quests')}>
+            QUESTS{quests ? ` · ${quests.daily.filter((q) => q.done).length + quests.weekly.filter((q) => q.done).length}/${quests.daily.length + quests.weekly.length}` : ''}
+          </button>
         </span>
         <div className="skills-xp">
           <span className="num">
@@ -166,9 +193,60 @@ export function SkillsMode({ evaluated }) {
           </span>
         </div>
       </div>
-      {tab === 'arsenal' && <Arsenal arsenal={arsenal} onHover={setHover} />}
+      {tab === 'arsenal' && (
+        <div className="skills-stage" onWheel={onWheel}>
+          <Arsenal arsenal={arsenal} onHover={setHover} viewBox={viewBox} onDetail={(s, c) => setDetail({ arsenalSkill: s, color: c })} />
+        </div>
+      )}
+      {tab === 'quests' && quests && (
+        <div className="quests-wrap">
+          <div className="quests-col">
+            <div className="u-label">DAILY · RESETS AT MIDNIGHT</div>
+            <div className="rule-ticks" />
+            {quests.daily.map((q) => {
+              const v = Math.min(q.target, questValue(q, usage, quests.weekStart))
+              return (
+                <div key={q.id} className={`quest brk${q.done ? ' done' : ''}`}>
+                  <div className="q-top">
+                    <span className="q-label">{q.done ? '✓ ' : ''}{q.label}</span>
+                    <span className="q-xp num">+{q.xp} XP</span>
+                  </div>
+                  <div className="q-row">
+                    <span className="bar"><i style={{ width: `${(v / q.target) * 100}%` }} /></span>
+                    <span className="num q-val">{v}/{q.target}</span>
+                    {!q.done && quests.rerolledOn !== quests.day && (
+                      <button className="q-reroll" data-tip="Reroll (once per day)" onClick={() => onReroll(q.id)}>⟲</button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="quests-col">
+            <div className="u-label">WEEKLY · RESETS MONDAY</div>
+            <div className="rule-ticks" />
+            {quests.weekly.map((q) => {
+              const v = Math.min(q.target, questValue(q, usage, quests.weekStart))
+              return (
+                <div key={q.id} className={`quest brk${q.done ? ' done' : ''}`}>
+                  <div className="q-top">
+                    <span className="q-label">{q.done ? '✓ ' : ''}{q.label}</span>
+                    <span className="q-xp num">+{q.xp} XP</span>
+                  </div>
+                  <div className="q-row">
+                    <span className="bar"><i style={{ width: `${(v / q.target) * 100}%` }} /></span>
+                    <span className="num q-val">{v}/{q.target}</span>
+                  </div>
+                </div>
+              )
+            })}
+            <div className="quest-total u-label">LIFETIME QUEST XP · <span className="num">{quests.bonusXp || 0}</span></div>
+          </div>
+        </div>
+      )}
       {tab === 'cortex' && (
-      <svg className="skills-svg" viewBox="-620 -540 1240 1080">
+      <div className="skills-stage" onWheel={onWheel}>
+      <svg className="skills-svg" viewBox={viewBox}>
         {/* edges */}
         {layout.edges.map((e) => {
           const unlocked = e.s.unlocked
@@ -214,6 +292,7 @@ export function SkillsMode({ evaluated }) {
               className={`st-node ${s.state}`}
               onMouseEnter={(e) => setHover({ skill: s, x: e.clientX, y: e.clientY })}
               onMouseLeave={() => setHover(null)}
+              onClick={() => setDetail({ skill: s })}
             >
               {s.unlocked && <circle r={r + 6} fill={col} opacity="0.14" />}
               {s.state === 'unlockable' && <circle r={r + 5} fill="none" stroke={col} strokeOpacity="0.5" className="st-pulse" />}
@@ -246,6 +325,51 @@ export function SkillsMode({ evaluated }) {
           </text>
         ))}
       </svg>
+      </div>
+      )}
+
+      {detail && (
+        <div className="skdetail glass brk">
+          <button className="skd-close" onClick={() => setDetail(null)}>✕</button>
+          {detail.skill ? (
+            <>
+              <div className="sk-name" style={{ color: stateColor(detail.skill) }}>{detail.skill.name}</div>
+              <div className="u-label">
+                {detail.skill.branch} · TIER {ROMAN[detail.skill.tier - 1] || detail.skill.tier} ·{' '}
+                {detail.skill.unlocked ? 'UNLOCKED' : detail.skill.state === 'dormant' ? 'LOCKED' : 'IN PROGRESS'}
+              </div>
+              <div className="sk-flavor">“{detail.skill.flavor}”</div>
+              <div className="skd-sec u-label">WHAT THIS BRANCH MEASURES</div>
+              <p className="skd-text">{BRANCH_USES[detail.skill.branch]}</p>
+              <div className="skd-sec u-label">HOW TO EARN IT</div>
+              {detail.skill.parts.map((p) => (
+                <div key={p.label} className="sk-part">
+                  <span className="sk-part-label">{p.label}</span>
+                  <span className="bar"><i style={{ width: `${p.progress * 100}%`, background: stateColor(detail.skill) }} /></span>
+                  <span className="num sk-part-val">
+                    {p.done ? '✓' : `${Math.round(p.value).toLocaleString()} / ${p.target.toLocaleString()}`}
+                  </span>
+                </div>
+              ))}
+              {detail.skill.state === 'dormant' && <div className="sk-gate">Requires Knowledge Engine (Claude API key)</div>}
+            </>
+          ) : (
+            <>
+              <div className="sk-name" style={{ color: detail.color }}>{detail.arsenalSkill.name}</div>
+              <div className="u-label">
+                {detail.arsenalSkill.group} ·{' '}
+                {detail.arsenalSkill.source === 'plugin' ? `PLUGIN v${detail.arsenalSkill.version}` : 'USER SKILL'}
+              </div>
+              <div className="skd-sec u-label">WHAT IT DOES</div>
+              <p className="skd-text">{detail.arsenalSkill.description || detail.arsenalSkill.blurb || 'No description in this SKILL.md.'}</p>
+              <div className="skd-sec u-label">USE IT</div>
+              <p className="skd-text">
+                Invoke from Claude Code{detail.arsenalSkill.source === 'user' ? ` with /${detail.arsenalSkill.name}` : ''} — installed at{' '}
+                {detail.arsenalSkill.source === 'plugin' ? `plugins/${detail.arsenalSkill.plugin}` : '~/.claude/skills'}.
+              </p>
+            </>
+          )}
+        </div>
       )}
 
       {hover && hover.arsenalSkill && (
