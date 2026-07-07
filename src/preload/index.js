@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('onyx', {
   markUnlocked: (ids) => ipcRenderer.invoke('usage:markUnlocked', ids),
   getSnapshots: () => ipcRenderer.invoke('snapshots:get'),
   getBrowseLive: () => ipcRenderer.invoke('browse:live'),
+  historyList: (id) => ipcRenderer.invoke('history:list', id),
+  historyRead: (id, file) => ipcRenderer.invoke('history:read', id, file),
   getInstalledSkills: () => ipcRenderer.invoke('skills:installed'),
   storeGet: (name) => ipcRenderer.invoke('store:get', name),
   storeSet: (name, data) => ipcRenderer.invoke('store:set', name, data),

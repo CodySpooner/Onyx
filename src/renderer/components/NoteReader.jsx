@@ -3,7 +3,116 @@ import MarkdownIt from 'markdown-it'
 import { extractLinkContext } from '../lib/backlinks.mjs'
 import { neighborhood, radialLayout } from '../lib/neighborhood.mjs'
 import { extractOutline } from '../lib/outline.mjs'
+import { diffLines, diffStats } from '../lib/diff.mjs'
+import { bus } from '../lib/bus.mjs'
 import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
+
+// Time Capsule: shadow snapshots taken automatically before every Onyx write.
+// Diff against now, restore with compare-and-swap + UNDO.
+function History({ id, raw }) {
+  const [items, setItems] = useState([])
+  const [open, setOpen] = useState(false)
+  const [view, setView] = useState(null) // { ts, file, content, ops, big }
+  useEffect(() => {
+    let dead = false
+    window.onyx.historyList?.(id).then((r) => {
+      if (!dead) setItems(r || [])
+    })
+    return () => {
+      dead = true
+    }
+  }, [id, raw])
+
+  if (!items.length) return null
+  const stamp = (ts) => new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+
+  const openDiff = async (item) => {
+    const content = await window.onyx.historyRead?.(id, item.file)
+    if (content == null) {
+      bus.emit('toast', { msg: '✕ snapshot unreadable', kind: 'err' })
+      return
+    }
+    setView({ ...item, content, ...diffLines(content, raw ?? '') })
+  }
+  const restore = async () => {
+    const cur = await window.onyx.readNote(id)
+    if (cur !== (raw ?? cur)) {
+      bus.emit('toast', { msg: '✕ note changed since you opened it — reopen and retry', kind: 'err' })
+      return
+    }
+    const ok = await window.onyx.writeNote(id, view.content)
+    if (!ok) {
+      bus.emit('toast', { msg: '✕ restore failed — vault not writable', kind: 'err' })
+      return
+    }
+    const before = cur
+    bus.emit('toast', {
+      msg: `⌛ restored snapshot from ${stamp(view.ts)}`,
+      kind: 'skill',
+      action: {
+        label: 'UNDO',
+        run: async () => {
+          const now = await window.onyx.readNote(id)
+          if (now !== view.content) {
+            bus.emit('toast', { msg: '✕ note changed since — undo skipped', kind: 'err' })
+            return
+          }
+          await window.onyx.writeNote(id, before)
+          bus.emit('toast', { msg: '↩ restore undone' })
+        }
+      }
+    })
+    setView(null)
+  }
+
+  return (
+    <div className="history">
+      <button className="u-label ol-head" onClick={() => setOpen((o) => !o)}>
+        {open ? '▾' : '▸'} TIME CAPSULE · {items.length}
+      </button>
+      {open && (
+        <div className="hist-rows">
+          {items.slice(0, 10).map((it) => (
+            <button key={it.file} className="hist-row" onClick={() => openDiff(it)}>
+              <span>{stamp(it.ts)}</span>
+              <span className="u-label">VIEW DIFF</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {view && (
+        <div className="veil" onMouseDown={() => setView(null)}>
+          <div className="histdiff glass brk" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="u-label rv-head">
+              SNAPSHOT {stamp(view.ts)} → NOW
+              {!view.big && (() => {
+                const s = diffStats(view.ops)
+                return ` · +${s.add} −${s.del}`
+              })()}
+            </div>
+            <div className="rule-ticks" />
+            <div className="hist-diff-body">
+              {view.big ? (
+                <pre className="daily-preview">{view.content.slice(0, 4000)}</pre>
+              ) : (
+                view.ops.map((o, i) => (
+                  <div key={i} className={`dl ${o.type}`}>
+                    {o.type === 'add' ? '+ ' : o.type === 'del' ? '− ' : '  '}
+                    {o.text}
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="tri-foot">
+              <button className="rv-g" onClick={restore}>⌛ RESTORE THIS VERSION</button>
+              <button className="rv-g" onClick={() => setView(null)}>CLOSE</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 // heading tree; click scrolls the body to the nth rendered h1-h6 (ordinal
 // match — outline and markdown-it parse the same post-frontmatter text)
@@ -405,6 +514,7 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
           <Minimap note={note} graph={graph} clusters={clusters} onSelect={onSelect} />
           <SuggestedLinks note={note} graph={graph} suggestions={suggestions} onAccept={onAcceptSuggestion} onDismiss={onDismissSuggestion} onSelect={onSelect} />
           <Backlinks note={note} graph={graph} onSelect={onSelect} />
+          <History id={id} raw={raw} />
         </>
       )}
     </aside>

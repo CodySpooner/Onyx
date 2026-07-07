@@ -8,6 +8,7 @@ import { setupUpdater, installUpdate, checkUpdatesNow } from './updater.js'
 import { loadUsage, bumpUsage, markUnlocked, loadSnapshots, recordSnapshot, flush } from './appdata.js'
 import { scanInstalledSkills } from './claude-skills.js'
 import { fetchBrowseLive } from './browse-live.js'
+import { snapshotNote, listHistory, readHistory } from './history.js'
 import { storeGet, storeSet } from './store.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -127,6 +128,11 @@ ipcMain.handle('vault:readNote', async (_e, id) => {
 ipcMain.handle('vault:writeNote', async (_e, id, content) => {
   const { vaultPath } = loadConfig()
   try {
+    // Time Capsule: shadow the PREVIOUS content before overwriting
+    try {
+      const prev = await readNoteRaw(vaultPath, id)
+      if (prev != null && prev !== content) snapshotNote(id, prev)
+    } catch { /* new file — nothing to shadow */ }
     await writeNoteRaw(vaultPath, id, content)
     // don't rely on chokidar (flaky on OneDrive): reindex + broadcast now so
     // optimistic UI (pending task marks) always resolves
@@ -177,6 +183,8 @@ ipcMain.handle('usage:markUnlocked', (_e, ids) => markUnlocked(ids))
 ipcMain.handle('snapshots:get', () => loadSnapshots().days)
 ipcMain.handle('skills:installed', () => scanInstalledSkills())
 ipcMain.handle('browse:live', () => fetchBrowseLive())
+ipcMain.handle('history:list', (_e, id) => listHistory(id))
+ipcMain.handle('history:read', (_e, id, file) => readHistory(id, file))
 ipcMain.handle('store:get', (_e, name) => storeGet(name))
 ipcMain.handle('store:set', (_e, name, data) => storeSet(name, data))
 ipcMain.handle('shell:openExternal', (_e, url) => {
