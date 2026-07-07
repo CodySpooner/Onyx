@@ -583,6 +583,7 @@ export default function App() {
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
     { label: 'View: Brain', hint: 'lens', run: () => { changeMode('brain'); changeView('brain') } },
+    { label: 'View: Nexus Core', hint: 'lens', run: () => { changeMode('brain'); changeView('nexus') } },
     { label: 'View: Atlas', hint: 'lens', run: () => { changeMode('brain'); changeView('atlas') } },
     { label: 'View: Stacks', hint: 'lens', run: () => { changeMode('brain'); changeView('stacks') } },
     { label: 'View: Archive City', hint: 'lens', run: () => { changeMode('brain'); changeView('city') } },

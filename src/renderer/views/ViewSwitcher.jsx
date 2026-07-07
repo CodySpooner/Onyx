@@ -1,6 +1,7 @@
 // monochrome glyphs only — full-color emoji breaks the HUD's glyph discipline
 const VIEWS = [
   { id: 'brain', label: '◍ Brain' },
+  { id: 'nexus', label: '❖ Nexus Core' },
   { id: 'atlas', label: '◈ Atlas' },
   { id: 'stacks', label: '▤ Stacks' },
   { id: 'city', label: '▙ Archive City' },

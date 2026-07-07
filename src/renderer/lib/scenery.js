@@ -29,7 +29,7 @@ const hashInt = (str) => {
 }
 
 const GEO = {}
-function unitGeometry(kind) {
+export function unitGeometry(kind) {
   if (GEO[kind]) return GEO[kind]
   let g
   if (kind === 'ico') g = new THREE.IcosahedronGeometry(1, 1)
@@ -41,8 +41,8 @@ function unitGeometry(kind) {
   return g
 }
 
-const SHAPES = ['sphere', 'ico', 'octa', 'dodeca', 'tetra']
-function shapeFor(type) {
+export const SHAPES = ['sphere', 'ico', 'octa', 'dodeca', 'tetra']
+export function shapeFor(type) {
   if (!type) return 'sphere'
   return SHAPES[hashInt(String(type)) % SHAPES.length]
 }
