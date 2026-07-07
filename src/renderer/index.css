@@ -285,10 +285,10 @@ button:hover { background: #26335c; }
 .statusbar { position: fixed; left: 0; right: 0; bottom: 0; height: 26px; z-index: 10;
   display: flex; align-items: stretch; background: rgba(9, 9, 11, 0.75); backdrop-filter: blur(8px);
   border-top: 1px solid var(--hairline); font: 400 10px/1 var(--font-mono); letter-spacing: 0.1em; color: var(--text-faint); }
-.sb-seg { display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; border-left: 1px solid var(--hairline); }
+.sb-seg { display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; border-left: 1px solid var(--hairline); white-space: nowrap; }
 .sb-seg:first-child { border-left: none; }
 .sb-spacer { flex: 1; }
-.sb-vault { background: transparent; border: none; border-left: 1px solid var(--hairline); border-radius: 0; color: var(--text-faint); cursor: pointer; font: inherit; letter-spacing: inherit; }
+.sb-vault { background: transparent; border: none; border-left: 1px solid var(--hairline); border-radius: 0; color: var(--text-faint); cursor: pointer; font: inherit; letter-spacing: inherit; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .sb-vault:hover { color: var(--text-dim); background: transparent; }
 [data-tier='ok'] { color: var(--text-faint); }
 [data-tier='warn'] { color: var(--warn); }
@@ -300,6 +300,7 @@ button:hover { background: #26335c; }
 .toasts { position: fixed; right: 72px; bottom: 156px; z-index: 40; display: flex; flex-direction: column; gap: 8px; }
 .toast { padding: 10px 14px; font: 500 11px/1.4 var(--font-mono); letter-spacing: 0.06em; color: var(--text); animation: panelIn 0.24s var(--ease-out); }
 .toast.skill { color: var(--warn); }
+.toast.err { color: var(--err); border-color: rgba(255, 154, 154, 0.35); }
 
 /* sidebar sections */
 .section { display: flex; flex-direction: column; }
@@ -465,7 +466,7 @@ button:hover { background: #26335c; }
 
 /* focus mode (B2): only the note remains */
 .app.focus .topbar, .app.focus .foldertabs, .app.focus .hud-body,
-.app.focus .statusbar, .app.focus .hovercard { display: none; }
+.app.focus .statusbar, .app.focus .hovercard, .app.focus .mode-scrim { display: none; }
 .app.focus .stage { filter: brightness(0.22) saturate(0.4) blur(2px); }
 .app.focus .reader { top: 28px; bottom: 28px; left: 50%; right: auto; transform: translateX(-50%); width: 860px; max-width: 92vw; }
 .app.focus .reader.editing { width: 1040px; }

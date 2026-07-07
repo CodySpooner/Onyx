@@ -45,7 +45,9 @@ export default function App() {
   const [pins, setPins] = useState([])
   const [flyTo, setFlyTo] = useState(null)
   const [srs, setSrs] = useState({})
+  const [srsLoaded, setSrsLoaded] = useState(false)
   const srsStamped = useRef(false)
+  const [reviewQueue, setReviewQueue] = useState([])
   const lastOpened = useRef(null)
   const announced = useRef(new Set()) // unlock toasts already shown this session
 
@@ -70,28 +72,30 @@ export default function App() {
       setPins(Array.isArray(c.pins) ? c.pins : [])
     })
     window.onyx.getUsage?.().then(setUsage)
-    window.onyx.storeGet?.('srs').then((s) => setSrs(prune(s?.states || {}, Date.now())))
+    window.onyx.storeGet?.('srs').then((s) => {
+      setSrs(s?.states || {}) // unpruned — liveness in the vault decides below
+      setSrsLoaded(true)
+    })
   }, [])
 
-  // once per session: refresh lastSeen for cards still present in the vault
-  // so the 60d prune never eats a live card's schedule
+  // once per session, after BOTH store and graph arrive: stamp lastSeen for
+  // cards still in the vault, THEN prune — so a 60d+ gap between launches
+  // never wipes a live card's schedule
   useEffect(() => {
-    if (srsStamped.current || !graph?.cards?.length) return
+    if (srsStamped.current || !srsLoaded || !graph?.cards?.length) return
     srsStamped.current = true
     setSrs((prev) => {
       const now = Date.now()
-      let changed = false
-      const next = { ...prev }
-      for (const c of graph.cards) {
-        if (next[c.hash]) {
-          next[c.hash] = { ...next[c.hash], lastSeen: now }
-          changed = true
-        }
+      const live = new Set(graph.cards.map((c) => c.hash))
+      const stamped = {}
+      for (const [hash, st] of Object.entries(prev)) {
+        stamped[hash] = live.has(hash) ? { ...st, lastSeen: now } : st
       }
-      if (changed) window.onyx.storeSet?.('srs', { states: next })
-      return changed ? next : prev
+      const next = prune(stamped, now)
+      window.onyx.storeSet?.('srs', { states: next })
+      return next
     })
-  }, [graph])
+  }, [graph, srsLoaded])
 
   // debounced search counter (Explorer branch fuel)
   useEffect(() => {
@@ -197,6 +201,7 @@ export default function App() {
   const guardDirty = () => !kbRef.current.dirty || window.confirm('Discard unsaved edits?')
   const selectNote = (id) => {
     if (!guardDirty()) return
+    if (id == null) setFocusMode(false) // closing the reader always exits focus
     setSelected(id)
   }
 
@@ -285,6 +290,12 @@ export default function App() {
   const templates = templateFolder ? graph.notes.filter((n) => n.folder === templateFolder) : []
 
   const due = graph?.cards ? dueCards(graph.cards, srs, Date.now()) : []
+  // freeze the deck at open time — live `due` shrinks with every grade,
+  // which would skip cards / strand the modal if passed directly
+  const openReview = () => {
+    setReviewQueue(due)
+    setOverlay('review')
+  }
   const handleGrade = (card, g) => {
     const next = { ...srs, [card.hash]: grade(srs[card.hash], g, Date.now()) }
     setSrs(next)
@@ -318,7 +329,7 @@ export default function App() {
       run: () => createFromTemplate(t.id)
     })),
     { label: 'Quick capture', hint: 'Ctrl+Shift+N', run: () => setOverlay('capture') },
-    ...(due.length ? [{ label: `Review due cards (${due.length})`, hint: 'srs', run: () => setOverlay('review') }] : []),
+    ...(due.length ? [{ label: `Review due cards (${due.length})`, hint: 'srs', run: openReview }] : []),
     ...(selected
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
@@ -389,7 +400,7 @@ export default function App() {
               onOpenDaily={openDaily}
               pins={pins}
               dueCount={due.length}
-              onReview={() => setOverlay('review')}
+              onReview={openReview}
             />
             <div className="hud-spacer" />
             <Cockpit
@@ -432,8 +443,8 @@ export default function App() {
           onClose={() => setOverlay(null)}
         />
       )}
-      {overlay === 'review' && due.length > 0 && (
-        <ReviewModal due={due} onGrade={handleGrade} onClose={() => setOverlay(null)} />
+      {overlay === 'review' && reviewQueue.length > 0 && (
+        <ReviewModal due={reviewQueue} onGrade={handleGrade} onClose={() => setOverlay(null)} />
       )}
       {selected && (
         <NoteReader

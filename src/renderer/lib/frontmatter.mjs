@@ -10,13 +10,16 @@ export function setFrontmatterKey(raw, key, value) {
   if (value !== true && value !== false && typeof value !== 'string' && typeof value !== 'number') {
     throw new Error('setFrontmatterKey: scalar values only')
   }
-  const text = String(raw)
+  const full = String(raw)
+  // BOM-prefixed files (PowerShell/Notepad UTF-8) must not grow a second block
+  const bom = full.charCodeAt(0) === 0xfeff ? '\ufeff' : ''
+  const text = bom ? full.slice(1) : full
   const line = `${key}: ${value}`
   const m = text.match(BLOCK_RE)
 
   if (!m) {
     const eol = text.includes('\r\n') ? '\r\n' : '\n'
-    return `---${eol}${line}${eol}---${eol}` + text
+    return bom + `---${eol}${line}${eol}---${eol}` + text
   }
 
   const eol = m[1]
@@ -28,5 +31,5 @@ export function setFrontmatterKey(raw, key, value) {
   } else {
     nextBlock = block + eol + line
   }
-  return text.slice(0, m.index) + `---${eol}${nextBlock}${eol}---${m[3]}` + text.slice(m.index + m[0].length)
+  return bom + text.slice(0, m.index) + `---${eol}${nextBlock}${eol}---${m[3]}` + text.slice(m.index + m[0].length)
 }
