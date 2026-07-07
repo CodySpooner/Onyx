@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdtempSync, rmSync } from 'node:fs'
 import os from 'node:os'
-import { scanVault, writeNoteRaw, readNoteRaw, createNote, deleteNote, renameNote } from '../src/main/vault-indexer.mjs'
+import { scanVault, writeNoteRaw, readNoteRaw, createNote, deleteNote, renameNote, ensureNote } from '../src/main/vault-indexer.mjs'
 
 const VAULT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixture-vault')
 
@@ -51,6 +51,31 @@ test('writeNoteRaw round-trips content and refuses path traversal', async () => 
     await writeNoteRaw(dir, 'note.md', '# Hi\nedited')
     assert.equal(await readNoteRaw(dir, 'note.md'), '# Hi\nedited')
     await assert.rejects(() => writeNoteRaw(dir, '../escape.md', 'x'))
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('notes carry parsed tasks with on-disk line numbers', async () => {
+  const g = await scanVault(VAULT)
+  const beta = g.notes.find((n) => n.id.endsWith('beta.md'))
+  assert.equal(beta.tasks.length, 1)
+  assert.equal(beta.tasks[0].text, 'fixture task')
+  assert.equal(beta.tasks[0].line, 4) // counts the frontmatter lines
+  assert.equal(beta.tasks[0].done, false)
+})
+
+test('ensureNote creates once, reports created:false after, refuses escapes', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'onyx-'))
+  try {
+    const first = await ensureNote(dir, 'Daily/2026-07-07.md', '# hi\n')
+    assert.deepEqual(first, { created: true })
+    assert.equal(await readNoteRaw(dir, 'Daily/2026-07-07.md'), '# hi\n')
+    const again = await ensureNote(dir, 'Daily/2026-07-07.md', 'DIFFERENT')
+    assert.deepEqual(again, { created: false })
+    assert.equal(await readNoteRaw(dir, 'Daily/2026-07-07.md'), '# hi\n', 'never clobbers')
+    await assert.rejects(() => ensureNote(dir, '../escape.md', 'x'))
+    await assert.rejects(() => ensureNote(dir, 'note.txt', 'x'))
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

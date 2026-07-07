@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import matter from 'gray-matter'
+import { parseTasks } from '../renderer/lib/tasks.mjs'
 
 const SAFE = /[\\/:*?"<>|#^[\]]/g
 function insideVault(vaultPath, abs) {
@@ -74,6 +75,7 @@ export async function scanVault(vaultPath) {
       updated: data.updated instanceof Date ? data.updated.toISOString().slice(0, 10) : (data.updated ?? null),
       mtime: mtime ?? (Number.isFinite(Date.parse(data.updated)) ? Date.parse(data.updated) : Date.now()),
       wordCount: content.split(/\s+/).filter(Boolean).length,
+      tasks: parseTasks(raw, rel),
       outLinks: [],
       inLinks: [],
       _content: content
@@ -138,6 +140,21 @@ export async function createNote(vaultPath, folder, title) {
   await fs.mkdir(path.dirname(abs), { recursive: true })
   await fs.writeFile(abs, `---\ntitle: ${name}\n---\n\n`, 'utf8')
   return rel.split(path.sep).join('/')
+}
+
+// create-only write ('wx' flag): never clobbers an existing note
+export async function ensureNote(vaultPath, rel, content) {
+  const abs = path.join(vaultPath, rel)
+  insideVault(vaultPath, abs)
+  if (!String(rel).endsWith('.md')) throw new Error('ensureNote: .md files only')
+  await fs.mkdir(path.dirname(abs), { recursive: true })
+  try {
+    await fs.writeFile(abs, content, { flag: 'wx' })
+    return { created: true }
+  } catch (e) {
+    if (e.code === 'EEXIST') return { created: false }
+    throw e
+  }
 }
 
 export async function deleteNote(vaultPath, id) {

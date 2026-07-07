@@ -7,7 +7,9 @@ const DEFAULTS = {
   sizeBy: 'links',
   colorBy: 'folder',
   showAllLinks: true,
-  showLabels: false
+  showLabels: false,
+  pins: [],
+  dailyFolder: '06 - Daily Logs'
 }
 
 const file = () => path.join(app.getPath('userData'), 'onyx-config.json')

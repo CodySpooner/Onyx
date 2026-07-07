@@ -5,14 +5,10 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { hashAngle } from '../lib/graph.mjs'
 import { createSim } from '../lib/force.mjs'
-import { detectClusters } from '../lib/clusters.mjs'
+import { detectClusters, CLUSTER_PALETTE } from '../lib/clusters.mjs'
 import { makeLabel } from '../lib/label.js'
 import { makeOrb, addLights, makeStarfield, makeNebula, LinkPulses } from '../lib/scenery.js'
 
-const CLUSTER_PALETTE = [
-  '#7fd4ff', '#c77dff', '#7bffb0', '#ffd166', '#ff7b9c', '#4cc9f0',
-  '#bdb2ff', '#80ed99', '#ff9f1c', '#f72585', '#9bf6ff', '#fdffb6'
-]
 const ORPHAN_COLOR = '#4a5470'
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 

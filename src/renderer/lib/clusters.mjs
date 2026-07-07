@@ -1,3 +1,9 @@
+// One palette for cluster identity everywhere (brain neurons, dashboard bars)
+export const CLUSTER_PALETTE = [
+  '#7fd4ff', '#c77dff', '#7bffb0', '#ffd166', '#ff7b9c', '#4cc9f0',
+  '#bdb2ff', '#80ed99', '#ff9f1c', '#f72585', '#9bf6ff', '#fdffb6'
+]
+
 // Label propagation community detection. Deterministic: nodes iterate in
 // sorted-id order, ties break sticky-then-smallest. Votes are weighted by
 // 1/degree(neighbor) so hub notes (Home, MOCs) can't flood the whole vault

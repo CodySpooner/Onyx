@@ -38,8 +38,9 @@ test('bridgeStats counts only cross-cluster links between real clusters', () => 
   assert.deepEqual(b.top[0], { id: 'c', cross: 2 })
 })
 
-test('maturity applies the spec formula', () => {
-  // 4 notes: degrees 1,2,1,0 → avg 1 → density 1/6; connected 3/4; all fresh
+test('maturity v2 applies the five-part formula', () => {
+  // degrees 1,2,1,0 → density 1/6; structure 3/4; all fresh (freshness 1);
+  // all touched the same day → consistency 1/12; no wordCounts → depth 0
   const notes = [
     note('A', 1, ['B'], []),
     note('B', 1, ['C'], ['A']),
@@ -47,8 +48,22 @@ test('maturity applies the spec formula', () => {
     note('D', 1, [], [])
   ]
   const m = maturity(notes, NOW)
-  assert.equal(m.score, 65) // 40*0.75 + 30*1 + 30*(1/6) = 65
+  // 25*.75 + 20*(1/6) + 20*1 + 20*(1/12) + 15*0 = 43.75 → 44
+  assert.equal(m.score, 44)
   assert.equal(m.connectedRatio, 0.75)
+  for (const [k, v] of Object.entries(m.parts)) {
+    assert.ok(v >= 0 && v <= 1, `${k} in [0,1]`)
+  }
+})
+
+test('maturity v2: empty vault → 0, no NaN; rich fresh vault scores high', () => {
+  const empty = maturity([], NOW)
+  assert.equal(empty.score, 0)
+  const rich = Array.from({ length: 14 }, (_, i) =>
+    ({ ...note(`R${i}`, i % 12, ['x', 'y', 'z'], ['a', 'b', 'c']), wordCount: 400 })
+  )
+  const m = maturity(rich, NOW)
+  assert.ok(m.score >= 85, `rich fresh vault ${m.score} >= 85`)
 })
 
 test('nextActions caps at 3: orphans → cold → velocity (small cluster skips isolation rule)', () => {

@@ -2,9 +2,10 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import chokidar from 'chokidar'
-import { scanVault, readNoteRaw, writeNoteRaw, createNote, deleteNote, renameNote } from './vault-indexer.mjs'
+import { scanVault, readNoteRaw, writeNoteRaw, createNote, deleteNote, renameNote, ensureNote } from './vault-indexer.mjs'
 import { loadConfig, saveConfig } from './config.js'
 import { setupUpdater, installUpdate } from './updater.js'
+import { loadUsage, bumpUsage, markUnlocked, loadSnapshots, recordSnapshot, flush } from './appdata.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 let win
@@ -22,6 +23,20 @@ async function reindex() {
   } catch {
     cachedGraph = null
   }
+  if (cachedGraph) {
+    try {
+      const d = new Date()
+      recordSnapshot({
+        date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+        notes: cachedGraph.meta.noteCount,
+        links: cachedGraph.meta.linkCount,
+        words: cachedGraph.notes.reduce((s, n) => s + (n.wordCount || 0), 0),
+        orphans: cachedGraph.notes.filter((n) => !n.inLinks.length && !n.outLinks.length).length
+      })
+    } catch (e) {
+      console.error('snapshot failed:', e)
+    }
+  }
   return cachedGraph
 }
 
@@ -35,6 +50,7 @@ function watchVault() {
   const bump = () => {
     clearTimeout(t)
     t = setTimeout(async () => {
+      bumpUsage('vaultEdit') // Obsidian edits count toward streaks too
       const g = await reindex()
       if (g) win?.webContents.send('vault:update', g)
     }, 300)
@@ -134,6 +150,20 @@ ipcMain.handle('vault:renameNote', async (_e, id, title) => {
 ipcMain.handle('config:get', () => loadConfig())
 ipcMain.handle('config:set', (_e, patch) => saveConfig(patch))
 ipcMain.handle('update:install', () => installUpdate())
+ipcMain.handle('app:version', () => app.getVersion())
+ipcMain.handle('usage:get', () => loadUsage())
+ipcMain.handle('usage:bump', (_e, name, n) => bumpUsage(name, n))
+ipcMain.handle('usage:markUnlocked', (_e, ids) => markUnlocked(ids))
+ipcMain.handle('snapshots:get', () => loadSnapshots().days)
+ipcMain.handle('vault:ensureNote', async (_e, rel, content) => {
+  const { vaultPath } = loadConfig()
+  try {
+    return await ensureNote(vaultPath, rel, content)
+  } catch (e) {
+    console.error('ensureNote failed:', e)
+    return null
+  }
+})
 ipcMain.handle('vault:pickVault', async () => {
   const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
   if (r.canceled || !r.filePaths[0]) return cachedGraph
@@ -152,6 +182,8 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
+
+app.on('before-quit', () => flush())
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

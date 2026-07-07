@@ -16,6 +16,12 @@ contextBridge.exposeInMainWorld('onyx', {
     return () => ipcRenderer.removeListener('vault:update', h)
   },
   installUpdate: () => ipcRenderer.invoke('update:install'),
+  getVersion: () => ipcRenderer.invoke('app:version'),
+  getUsage: () => ipcRenderer.invoke('usage:get'),
+  bumpUsage: (name, n) => ipcRenderer.invoke('usage:bump', name, n),
+  markUnlocked: (ids) => ipcRenderer.invoke('usage:markUnlocked', ids),
+  getSnapshots: () => ipcRenderer.invoke('snapshots:get'),
+  ensureNote: (rel, content) => ipcRenderer.invoke('vault:ensureNote', rel, content),
   onUpdate: (cb) => {
     const h = (_e, s) => cb(s)
     ipcRenderer.on('update:status', h)

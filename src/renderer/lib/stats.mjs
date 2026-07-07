@@ -21,6 +21,12 @@ export const cleanFolder = (name) => String(name).replace(/^\d+\s*[-–]\s*/, ''
 const DAY = 86400000
 const WEEK = 7 * DAY
 
+// local calendar day key — the one date-bucketing primitive app-wide
+export const dayKey = (ms) => {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function velocity(notes, now) {
   const weeks = new Array(12).fill(0)
   for (const n of notes) {
@@ -60,16 +66,29 @@ export function bridgeStats(links, clusterOf) {
   return { count, top }
 }
 
+// maturity v2 — the ONE knowledge score app-wide (cockpit gauge, dashboard
+// hero, Curator "Immaculate"). Five parts; legacy keys kept for consumers.
 export function maturity(notes, now) {
   const n = notes.length || 1
-  const connected = notes.filter((x) => degree(x) > 0).length
-  const fresh = notes.filter((x) => x.mtime && now - x.mtime <= 60 * DAY).length
+  const structure = notes.filter((x) => degree(x) > 0).length / n
   const avgDegree = notes.reduce((s, x) => s + degree(x), 0) / n
-  const connectedRatio = connected / n
-  const freshRatio = fresh / n
-  const densityScore = Math.min(1, avgDegree / 6)
-  const score = Math.round(40 * connectedRatio + 30 * freshRatio + 30 * densityScore)
-  return { score, connectedRatio, freshRatio, densityScore }
+  const density = Math.min(1, avgDegree / 6)
+  const freshness = notes.filter((x) => x.mtime && now - x.mtime <= 60 * DAY).length / n
+  const activeDays30 = new Set(
+    notes.filter((x) => x.mtime && now - x.mtime <= 30 * DAY).map((x) => dayKey(x.mtime))
+  ).size
+  const consistency = Math.min(1, activeDays30 / 12)
+  const words = notes.map((x) => x.wordCount || 0).sort((a, b) => a - b)
+  const median = words.length ? words[Math.floor((words.length - 1) / 2)] : 0
+  const depth = Math.min(1, median / 150)
+  const score = Math.round(25 * structure + 20 * density + 20 * freshness + 20 * consistency + 15 * depth)
+  return {
+    score,
+    parts: { structure, density, freshness, consistency, depth },
+    connectedRatio: structure,
+    freshRatio: freshness,
+    densityScore: density
+  }
 }
 
 export function nextActions({ notes, cold, trendPct, clusterOf, clusterCount, links }) {
