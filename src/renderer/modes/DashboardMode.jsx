@@ -15,6 +15,7 @@ import {
   activityGrid, growthSeries, deltas, wordStats,
   clusterBreakdown, topTags, recentNotes, relAge, linkHealth
 } from '../lib/dashboard.mjs'
+import { folderWordTrend, linkMatrix, tagMomentum, duplicateTitles } from '../lib/insights.mjs'
 
 const PAGES = ['overview', 'today', 'analytics', 'health']
 
@@ -42,6 +43,30 @@ function LineChart({ series }) {
       <polygon points={`0,40 ${pts.join(' ')} 100,40`} className="lc-area" />
       <polyline points={pts.join(' ')} className="lc-line" />
       <circle cx="100" cy={pts[pts.length - 1].split(',')[1]} r="1.6" className="lc-dot" />
+    </svg>
+  )
+}
+
+// several series, one viewbox — folder colors carry the identity
+function MultiLine({ seriesList }) {
+  const all = seriesList.flatMap((s) => s.series)
+  if (!all.length) return null
+  const max = Math.max(1, ...all)
+  return (
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="linechart">
+      {[10, 20, 30].map((y) => (
+        <line key={y} x1="0" y1={y} x2="100" y2={y} className="lc-grid" />
+      ))}
+      {seriesList.map((s) => (
+        <polyline
+          key={s.folder}
+          points={s.series.map((v, i) => `${(i / Math.max(1, s.series.length - 1)) * 100},${38 - (v / max) * 34}`).join(' ')}
+          fill="none"
+          stroke={s.color}
+          strokeWidth="1.1"
+          strokeOpacity="0.85"
+        />
+      ))}
     </svg>
   )
 }
@@ -202,6 +227,35 @@ export function DashboardMode({
 
   const P = (name, v) => `${name}: ${Math.round(v * 100)}%`
   const collectingDay = Math.min(7, snaps.length)
+
+  // page-gated heavies — ANALYTICS/HEALTH calcs don't run while you're on TODAY
+  const colorOfFolder = (fid) => graph.folders.find((f) => f.id === fid)?.color || '#8fa2d9'
+  const insights = useMemo(() => {
+    if (page !== 'analytics') return null
+    const now = Date.now()
+    const trend = folderWordTrend(graph.notes, now)
+    return {
+      trend: trend.folders.map((f) => ({ ...f, color: f.folder === 'OTHER' ? '#565f7d' : colorOfFolder(f.folder) })),
+      matrix: linkMatrix(graph.notes, graph.links),
+      momentum: tagMomentum(graph.notes, now)
+    }
+  }, [graph, page])
+  const healthCalcs = useMemo(() => {
+    if (page !== 'health') return null
+    const now = Date.now()
+    const groups = new Map()
+    for (const u of graph.unresolved || []) {
+      if (!groups.has(u.target)) groups.set(u.target, [])
+      groups.get(u.target).push(u.in)
+    }
+    return {
+      unresolvedGroups: [...groups.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 15),
+      dupes: duplicateTitles(graph.notes),
+      stale90: coldNotes(graph.notes, now, 90).slice(0, 12),
+      empties: graph.notes.filter((n) => (n.wordCount || 0) === 0),
+      broken: graph.notes.filter((n) => n.fmBroken)
+    }
+  }, [graph, page])
 
   const maturityPanel = (i) => (
     <section className="dpanel brk panel-in span4" style={{ '--i': i }}>
@@ -433,6 +487,76 @@ export function DashboardMode({
           ))}
         </div>
       </section>
+      {insights && (
+        <>
+          <section className="dpanel brk panel-in span8" style={{ '--i': 3 }}>
+            <div className="u-label" data-tip="Each note's words land on its last-touch week (file mtime)">
+              WORDS TOUCHED / WEEK · 26W · BY FOLDER
+            </div>
+            <div className="rule-ticks" />
+            <MultiLine seriesList={insights.trend} />
+            <div className="trend-legend">
+              {insights.trend.map((f) => (
+                <span key={f.folder} className="tl-chip">
+                  <i style={{ background: f.color }} />
+                  {f.folder === 'OTHER' ? 'OTHER' : cleanFolder(f.folder)}
+                </span>
+              ))}
+            </div>
+          </section>
+          <section className="dpanel brk panel-in span4" style={{ '--i': 4 }}>
+            <div className="u-label" data-tip="Row folder links → column folder. Click a cell to filter the brain.">
+              LINK FLOW · FOLDER × FOLDER
+            </div>
+            <div className="rule-ticks" />
+            <svg viewBox={`0 0 ${insights.matrix.folders.length * 16 + 20} ${insights.matrix.folders.length * 16 + 20}`} className="lm-svg">
+              {insights.matrix.folders.map((f, i) => (
+                <text key={'r' + f} x="16" y={30 + i * 16} className="lm-label" textAnchor="end">
+                  <title>{cleanFolder(f)}</title>
+                  {cleanFolder(f).slice(0, 2).toUpperCase()}
+                </text>
+              ))}
+              {insights.matrix.folders.map((rf, r) =>
+                insights.matrix.folders.map((cf, c) => {
+                  const v = insights.matrix.matrix[r][c]
+                  return (
+                    <rect
+                      key={rf + cf}
+                      x={20 + c * 16}
+                      y={20 + r * 16}
+                      width="14"
+                      height="14"
+                      rx="2"
+                      className="lm-cell"
+                      fill={r === c ? '#7bffb0' : '#6ea8ff'}
+                      fillOpacity={v ? 0.15 + 0.85 * (v / Math.max(1, insights.matrix.max)) : 0.04}
+                      onClick={() => onFilter({ q: '', folders: [rf], types: [], statuses: [], tags: [] })}
+                    >
+                      <title>{`${cleanFolder(rf)} → ${cleanFolder(cf)} · ${v} links`}</title>
+                    </rect>
+                  )
+                })
+              )}
+            </svg>
+          </section>
+          <section className="dpanel brk panel-in span4" style={{ '--i': 5 }}>
+            <div className="u-label" data-tip="recent = notes touched in 30d carrying the tag">
+              TAG MOMENTUM · 30D
+            </div>
+            <div className="rule-ticks" />
+            {insights.momentum.map((t) => (
+              <BarRow
+                key={t.tag}
+                color="#6ea8ff"
+                label={'#' + t.tag}
+                value={t.recent}
+                max={Math.max(1, insights.momentum[0]?.recent || 1)}
+                onClick={() => onFilter({ q: '', folders: [], types: [], statuses: [], tags: [t.tag] })}
+              />
+            ))}
+          </section>
+        </>
+      )}
     </>
   )
 
@@ -469,6 +593,76 @@ export function DashboardMode({
           ))}
         </div>
       </section>
+      {healthCalcs && (
+        <>
+          <section className="dpanel brk panel-in span4" style={{ '--i': 1 }}>
+            <div className="u-label" data-tip="Wikilinks pointing at notes that don't exist">
+              UNRESOLVED WIKILINKS · {(graph.unresolved || []).length}
+            </div>
+            <div className="rule-ticks" />
+            {healthCalcs.unresolvedGroups.map(([target, ins]) => (
+              <button key={target} className="cp-item" onClick={() => onSelect(ins[0])} data-tip={`referenced from ${ins.length} note${ins.length > 1 ? 's' : ''} — open the first`}>
+                <span className="cp-t">[[{target}]]</span>
+                <span className="cp-v num">×{ins.length}</span>
+              </button>
+            ))}
+            {!healthCalcs.unresolvedGroups.length && <div className="dp-sub ok">all wikilinks resolve</div>}
+          </section>
+          <section className="dpanel brk panel-in span4" style={{ '--i': 2 }}>
+            <div className="u-label" data-tip="Same title = wikilink resolution hazard">
+              DUPLICATE TITLES · {healthCalcs.dupes.length}
+            </div>
+            <div className="rule-ticks" />
+            {healthCalcs.dupes.slice(0, 6).map((group) => (
+              <div key={group[0].id} className="dup-group">
+                <div className="dp-sub">{group[0].title}</div>
+                {group.map((n) => (
+                  <button key={n.id} className="cp-item" onClick={() => onSelect(n.id)}>
+                    <span className="cp-t">{cleanFolder(n.folder)}</span>
+                    <span className="cp-v num">{n.wordCount}w</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+            {!healthCalcs.dupes.length && <div className="dp-sub ok">every title is unique</div>}
+          </section>
+          <section className="dpanel brk panel-in span4" style={{ '--i': 3 }}>
+            <div className="u-label">STALE · 90D+</div>
+            <div className="rule-ticks" />
+            {healthCalcs.stale90.map((c) => (
+              <button key={c.note.id} className="cp-item" onClick={() => onSelect(c.note.id)}>
+                <span className="cp-t">{c.note.title}</span>
+                <span className="cp-v num">{c.ageDays}d</span>
+              </button>
+            ))}
+            {!healthCalcs.stale90.length && <div className="dp-sub ok">nothing older than 90 days untouched</div>}
+          </section>
+          <section className="dpanel brk panel-in span4" style={{ '--i': 4 }}>
+            <div className="u-label">EMPTY NOTES · {healthCalcs.empties.length}</div>
+            <div className="rule-ticks" />
+            {healthCalcs.empties.slice(0, 8).map((n) => (
+              <button key={n.id} className="cp-item" onClick={() => onSelect(n.id)}>
+                <span className="cp-t">{n.title}</span>
+                <span className="cp-v num">{cleanFolder(n.folder)}</span>
+              </button>
+            ))}
+            {!healthCalcs.empties.length && <div className="dp-sub ok">no empty stubs</div>}
+          </section>
+          <section className="dpanel brk panel-in span4" style={{ '--i': 5 }}>
+            <div className="u-label" data-tip="YAML frontmatter that failed to parse — properties invisible">
+              BROKEN FRONTMATTER · {healthCalcs.broken.length}
+            </div>
+            <div className="rule-ticks" />
+            {healthCalcs.broken.slice(0, 8).map((n) => (
+              <button key={n.id} className="cp-item" onClick={() => onSelect(n.id)}>
+                <span className="cp-t">{n.title}</span>
+                <span className="cp-v num">{cleanFolder(n.folder)}</span>
+              </button>
+            ))}
+            {!healthCalcs.broken.length && <div className="dp-sub ok">all frontmatter parses</div>}
+          </section>
+        </>
+      )}
     </>
   )
 

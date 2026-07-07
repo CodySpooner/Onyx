@@ -792,3 +792,13 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .cal-cell.today { border-color: var(--accent); color: var(--text); }
 .cal-cell.has i { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
 .dash-tabs + .dash-grid { padding-top: 4px; }
+
+/* ── analytics/health page bits ── */
+.trend-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+.tl-chip { display: inline-flex; align-items: center; gap: 5px; color: var(--text-faint); font: 500 9px/1 var(--font-mono); letter-spacing: 0.06em; }
+.tl-chip i { width: 8px; height: 3px; border-radius: 2px; }
+.lm-svg { width: 100%; height: auto; max-width: 280px; display: block; margin: 4px auto 0; }
+.lm-label { fill: var(--text-faint); font: 500 7px var(--font-mono); }
+.lm-cell { cursor: pointer; }
+.lm-cell:hover { stroke: var(--accent); stroke-width: 1; }
+.dup-group { margin-bottom: 8px; }

@@ -66,12 +66,13 @@ export async function scanVault(vaultPath) {
     }
     let data = {}
     let content = raw
+    let fmBroken = false
     try {
       const p = matter(raw)
       data = p.data || {}
       content = p.content
     } catch {
-      /* best-effort: malformed frontmatter → treat whole file as content */
+      fmBroken = true // best-effort: malformed frontmatter → whole file is content
     }
     const base = path.basename(rel, '.md')
     const noteTags = normalizeTags(data.tags)
@@ -89,6 +90,7 @@ export async function scanVault(vaultPath) {
       mtime: mtime ?? (Number.isFinite(Date.parse(data.updated)) ? Date.parse(data.updated) : Date.now()),
       ctime: ctime ?? mtime ?? Date.now(),
       excerpt: makeExcerpt(content),
+      fmBroken,
       wordCount: content.split(/\s+/).filter(Boolean).length,
       tasks: parseTasks(raw, rel),
       outLinks: [],
@@ -103,17 +105,21 @@ export async function scanVault(vaultPath) {
 
   const noteById = new Map(notes.map((n) => [n.id, n]))
   const links = []
-  let unresolvedLinkCount = 0
+  const unresolved = [] // { in: noteId, target } — HEALTH page surfaces these
 
   for (const note of notes) {
     const targets = new Set()
+    const missed = new Set() // dedupe per note on lowercased target
     let m
     WIKILINK.lastIndex = 0
     while ((m = WIKILINK.exec(note._content))) {
       const target = m[1].split('|')[0].split('#')[0].trim()
       const targetId = byBasename.get(target.toLowerCase())
       if (targetId && targetId !== note.id) targets.add(targetId)
-      else if (!targetId) unresolvedLinkCount++
+      else if (!targetId && !missed.has(target.toLowerCase())) {
+        missed.add(target.toLowerCase())
+        if (unresolved.length < 500) unresolved.push({ in: note.id, target })
+      }
     }
     for (const t of targets) {
       note.outLinks.push(t)
@@ -136,13 +142,14 @@ export async function scanVault(vaultPath) {
     cards,
     habitEntries,
     suggestions,
+    unresolved,
     notes: publicNotes,
     links,
     meta: {
       vaultPath,
       noteCount: publicNotes.length,
       linkCount: links.length,
-      unresolvedLinkCount
+      unresolvedLinkCount: unresolved.length
     }
   }
 }
