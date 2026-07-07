@@ -6,8 +6,9 @@ import { GlobeView } from './GlobeView.js'
 import { BrainView } from './BrainView.js'
 import { StacksView } from './StacksView.js'
 import { AtlasView } from './AtlasView.js'
+import { ArchiveCityView } from './ArchiveCityView.js'
 
-const VIEWS = { brain: BrainView, atlas: AtlasView, stacks: StacksView, solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
+const VIEWS = { brain: BrainView, atlas: AtlasView, stacks: StacksView, city: ArchiveCityView, solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
 
 export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0, paused = false, focus = null }) {
   const ref = useRef(null)

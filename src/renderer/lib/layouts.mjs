@@ -38,6 +38,23 @@ export function shelfLayout(folders, notes) {
   return { pos, columns }
 }
 
+// ── ArchiveCity (district tower grid) ───────────────────────────
+// Centered square grid with wide streets; cells sorted center-out so the
+// tallest tower (assigned first) crowns the district.
+export function districtGrid(m, plot = 7.0) {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(m)))
+  const rows = Math.max(1, Math.ceil(m / cols))
+  const cells = []
+  for (let k = 0; k < cols * rows; k++) {
+    cells.push({
+      gx: ((k % cols) - (cols - 1) / 2) * plot,
+      gz: (Math.floor(k / cols) - (rows - 1) / 2) * plot
+    })
+  }
+  cells.sort((a, b) => Math.abs(a.gx) + Math.abs(a.gz) - (Math.abs(b.gx) + Math.abs(b.gz)))
+  return cells.slice(0, m)
+}
+
 // ── Atlas (Cluster Archipelago) ─────────────────────────────────
 // 17 islands with wide gulfs; every label owns its footprint.
 export const ATLAS = { FOOT: 30, GULF: 45, ORPHAN_PAD: 100 }

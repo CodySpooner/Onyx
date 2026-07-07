@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { shelfLayout, archipelagoLayout, SHELF, ATLAS } from '../src/renderer/lib/layouts.mjs'
+import { shelfLayout, archipelagoLayout, districtGrid, SHELF, ATLAS } from '../src/renderer/lib/layouts.mjs'
 
 const mkNotes = (folder, n, prefix = 'n') =>
   Array.from({ length: n }, (_, i) => ({ id: `${folder}/${prefix}${String(i).padStart(2, '0')}.md`, folder, title: `${prefix}${String(i).padStart(2, '0')}` }))
@@ -42,6 +42,21 @@ test('shelf: alphabetical order means daily logs sort chronologically', () => {
   const { pos } = shelfLayout(folders, notes)
   assert.ok(pos.get('D/2026-01-15.md').y > pos.get('D/2026-03-20.md').y)
   assert.ok(pos.get('D/2026-03-20.md').y > pos.get('D/2026-07-03.md').y)
+})
+
+test('districtGrid: exact count, no two cells closer than plot, center-out order', () => {
+  for (const m of [1, 5, 20]) {
+    const cells = districtGrid(m, 7)
+    assert.equal(cells.length, m)
+    for (let a = 0; a < cells.length; a++) {
+      for (let b = a + 1; b < cells.length; b++) {
+        const d = Math.hypot(cells[a].gx - cells[b].gx, cells[a].gz - cells[b].gz)
+        assert.ok(d >= 7 - 1e-9, `cells ${d.toFixed(2)} apart < plot`)
+      }
+    }
+  }
+  const [first] = districtGrid(9, 7)
+  assert.equal(Math.abs(first.gx) + Math.abs(first.gz), 0) // odd grid: exact center first
 })
 
 function synthCluster(nClusters, perCluster) {
