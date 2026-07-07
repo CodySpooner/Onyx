@@ -2,7 +2,36 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import MarkdownIt from 'markdown-it'
 import { extractLinkContext } from '../lib/backlinks.mjs'
 import { neighborhood, radialLayout } from '../lib/neighborhood.mjs'
+import { extractOutline } from '../lib/outline.mjs'
 import { CLUSTER_PALETTE } from '../lib/clusters.mjs'
+
+// heading tree; click scrolls the body to the nth rendered h1-h6 (ordinal
+// match — outline and markdown-it parse the same post-frontmatter text)
+function Outline({ raw, bodyRef }) {
+  const heads = useMemo(() => extractOutline(raw || ''), [raw])
+  const [open, setOpen] = useState(true)
+  if (heads.length < 2) return null
+  const jump = (ord) => {
+    const el = bodyRef.current?.querySelectorAll('h1,h2,h3,h4,h5,h6')[ord]
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  return (
+    <div className="outline">
+      <button className="u-label ol-head" onClick={() => setOpen((o) => !o)}>
+        {open ? '▾' : '▸'} OUTLINE · {heads.length}
+      </button>
+      {open && (
+        <div className="ol-rows">
+          {heads.map((h) => (
+            <button key={h.ord} className="ol-row" style={{ paddingLeft: 8 + (h.level - 1) * 12 }} onClick={() => jump(h.ord)}>
+              {h.text}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // 1-hop local graph, SVG, rendered once per note — link-walking without
 // touching the 3D scene.
@@ -366,6 +395,7 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
       )}
       {!editing && raw != null && (
         <>
+          <Outline raw={raw} bodyRef={ref} />
           <Minimap note={note} graph={graph} clusters={clusters} onSelect={onSelect} />
           <SuggestedLinks note={note} graph={graph} suggestions={suggestions} onAccept={onAcceptSuggestion} onDismiss={onDismissSuggestion} onSelect={onSelect} />
           <Backlinks note={note} graph={graph} onSelect={onSelect} />

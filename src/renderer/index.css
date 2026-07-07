@@ -824,3 +824,11 @@ button, .chip.toggle, .ftab, .tbtn, .mtab, .palette-row, .hubrow, .barrow, .task
 .skd-close:hover { color: var(--text); }
 .skd-sec { margin-top: 12px; margin-bottom: 5px; }
 .skd-text { color: var(--text-dim); font-size: 11.5px; line-height: 1.6; }
+
+/* ── reader outline ── */
+.outline { border-top: 1px solid var(--border); padding: 10px 16px 8px; }
+.ol-head { background: transparent; border: none; cursor: pointer; color: var(--text-faint); padding: 0; }
+.ol-head:hover { color: var(--text-dim); }
+.ol-rows { margin-top: 6px; max-height: 150px; overflow-y: auto; display: flex; flex-direction: column; }
+.ol-row { background: transparent; border: none; border-radius: 5px; color: var(--text-dim); font-size: 11px; line-height: 1.4; padding: 3px 8px; cursor: pointer; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-row:hover { background: rgba(255,255,255,0.04); color: var(--text); }
