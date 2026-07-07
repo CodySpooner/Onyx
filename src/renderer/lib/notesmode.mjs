@@ -55,6 +55,7 @@ export function makeExcerpt(content) {
   for (const line of String(content).split(/\r?\n/)) {
     const t = line.trim()
     if (!t || /^#{1,6}\s/.test(t) || /^(-{3,}|\*{3,}|_{3,})$/.test(t) || /^[a-zA-Z-]+:\s/.test(t)) continue
+    if (t.startsWith('<') || t.startsWith('```')) continue // raw HTML callouts / fences say nothing
     const clean = t
       .replace(/!?\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
       .replace(/!?\[\[([^\]]+)\]\]/g, '$1')

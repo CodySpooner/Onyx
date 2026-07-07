@@ -166,7 +166,7 @@ function renderBody(raw, basenameToId) {
   return md.render(withLinks)
 }
 
-export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSuggestion, onDismissSuggestion, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage, onEditingChange }) {
+export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSuggestion, onDismissSuggestion, onSelect, onClose, pinned = false, onTogglePin, onRenamed, onUsage, onEditingChange, docked = false }) {
   const [raw, setRaw] = useState(null)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -176,9 +176,10 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
   const ref = useRef(null)
   const baseRef = useRef(null) // disk content when editing began (conflict check)
 
-  // report dirtiness upward so App can guard against silent draft loss
+  // report dirtiness upward so App can guard against silent draft loss;
+  // second arg feeds the notes-mode live word count (overlay callers ignore it)
   useEffect(() => {
-    onEditingChange?.(editing && draft !== raw)
+    onEditingChange?.(editing && draft !== raw, editing ? draft : null)
   }, [editing, draft, raw, onEditingChange])
   useEffect(() => () => onEditingChange?.(false), [onEditingChange])
   const note = graph.notes.find((n) => n.id === id)
@@ -279,7 +280,7 @@ export function NoteReader({ id, graph, clusters, suggestions = [], onAcceptSugg
   const fcolor = (graph.folders.find((f) => f.id === note?.folder) || {}).color
 
   return (
-    <aside className={`reader ${editing ? 'editing' : ''}`} style={{ '--c': fcolor }}>
+    <aside className={`reader ${docked ? 'docked' : ''} ${editing ? 'editing' : ''}`} style={{ '--c': fcolor }}>
       <div className="reader-head">
         <div>
           {renaming ? (

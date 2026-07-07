@@ -29,6 +29,7 @@ import { insertWikilink, triageQueue } from './lib/suggest.mjs'
 import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
 import { TriageModal } from './components/TriageModal.jsx'
+import { NotesMode } from './modes/NotesMode.jsx'
 
 const skey = (s) => (s.a < s.b ? s.a + '|' + s.b : s.b + '|' + s.a)
 
@@ -220,12 +221,12 @@ export default function App() {
         setOverlay('capture')
         return
       }
-      if (e.ctrlKey && ['1', '2', '3'].includes(e.key)) {
+      if (e.ctrlKey && ['1', '2', '3', '4'].includes(e.key)) {
         e.preventDefault()
-        setMode(['brain', 'dashboard', 'skills'][+e.key - 1])
+        kbRef.current.changeMode?.(['brain', 'notes', 'dashboard', 'skills'][+e.key - 1])
         return
       }
-      if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.altKey && !e.metaKey && !inInput && k.selected) {
+      if (e.key.toLowerCase() === 'f' && !e.ctrlKey && !e.altKey && !e.metaKey && !inInput && k.selected && k.mode === 'brain') {
         e.preventDefault()
         setFocusMode((f) => !f)
         return
@@ -270,9 +271,9 @@ export default function App() {
     setShowLabels(next)
     window.onyx.setConfig({ showLabels: next })
   }
-  const handleCreate = async () => {
+  const handleCreate = async (intoFolder = null) => {
     if (!guardDirty()) return
-    const folder = filter.folders[0] || '(root)'
+    const folder = intoFolder || filter.folders[0] || '(root)'
     const id = await window.onyx.createNote(folder, 'Untitled')
     if (id) {
       setGraph(await window.onyx.getGraph())
@@ -295,6 +296,21 @@ export default function App() {
     }
   }
   kbRef.current.openNote = openNote
+  // ONE dirty-guarded mode switch: the reader REMOUNTS when it moves between
+  // the notes-mode dock and the overlay slot — an unguarded switch eats drafts
+  const changeMode = (m) => {
+    if (m === kbRef.current.mode) return
+    if (!guardDirty()) return
+    kbRef.current.dirty = false
+    setMode(m)
+  }
+  kbRef.current.changeMode = changeMode
+  const flyToBrain = (id) => {
+    if (!guardDirty()) return
+    kbRef.current.dirty = false
+    setMode('brain')
+    openNote(id)
+  }
   // Alt+Left: a real back-stack. Pop the tail FIRST, then select without a
   // fresh push — routing through openNote/pushTrail would move-to-end the
   // target and ping-pong between the last two notes forever.
@@ -340,14 +356,14 @@ export default function App() {
     bus.emit('toast', { msg: `◆ captured to ${id.split('/').pop()}`, kind: 'info', ttl: 2200 })
     return true
   }
-  const createFromTemplate = async (templateId) => {
+  const createFromTemplate = async (templateId, intoFolder = null) => {
     if (!guardDirty()) return
     const raw = await window.onyx.readNote(templateId)
     if (raw == null) {
       bus.emit('toast', { msg: '✗ template unreadable', kind: 'err', ttl: 3000 })
       return
     }
-    const folder = filter.folders[0] || '(root)'
+    const folder = intoFolder || filter.folders[0] || '(root)'
     const id = await window.onyx.createNote(folder, 'Untitled')
     if (!id) return
     const ok = await window.onyx.writeNote(id, applyTemplate(raw, { title: 'Untitled', now: new Date() }))
@@ -514,16 +530,17 @@ export default function App() {
     ...(selected
       ? [{ label: `${pins.includes(selected) ? 'Unpin' : 'Pin'}: ${graph.notes.find((n) => n.id === selected)?.title || ''}`, hint: 'pins', run: () => togglePin(selected) }]
       : []),
-    { label: 'View: Brain', hint: 'lens', run: () => { setMode('brain'); changeView('brain') } },
-    { label: 'View: Atlas', hint: 'lens', run: () => { setMode('brain'); changeView('atlas') } },
-    { label: 'View: Stacks', hint: 'lens', run: () => { setMode('brain'); changeView('stacks') } },
-    { label: 'View: Archive City', hint: 'lens', run: () => { setMode('brain'); changeView('city') } },
-    { label: 'View: Solar System', hint: 'lens', run: () => { setMode('brain'); changeView('solar') } },
-    { label: 'View: Core of Everything', hint: 'lens', run: () => { setMode('brain'); changeView('core') } },
-    { label: 'View: Second Brain Globe', hint: 'lens', run: () => { setMode('brain'); changeView('globe') } },
-    { label: 'View: Constellation', hint: 'lens', run: () => { setMode('brain'); changeView('constellation') } },
-    { label: 'Mode: Dashboard', hint: 'Ctrl+2', run: () => setMode('dashboard') },
-    { label: 'Mode: Skills', hint: 'Ctrl+3', run: () => setMode('skills') },
+    { label: 'View: Brain', hint: 'lens', run: () => { changeMode('brain'); changeView('brain') } },
+    { label: 'View: Atlas', hint: 'lens', run: () => { changeMode('brain'); changeView('atlas') } },
+    { label: 'View: Stacks', hint: 'lens', run: () => { changeMode('brain'); changeView('stacks') } },
+    { label: 'View: Archive City', hint: 'lens', run: () => { changeMode('brain'); changeView('city') } },
+    { label: 'View: Solar System', hint: 'lens', run: () => { changeMode('brain'); changeView('solar') } },
+    { label: 'View: Core of Everything', hint: 'lens', run: () => { changeMode('brain'); changeView('core') } },
+    { label: 'View: Second Brain Globe', hint: 'lens', run: () => { changeMode('brain'); changeView('globe') } },
+    { label: 'View: Constellation', hint: 'lens', run: () => { changeMode('brain'); changeView('constellation') } },
+    { label: 'Mode: Notes', hint: 'Ctrl+2', run: () => changeMode('notes') },
+    { label: 'Mode: Dashboard', hint: 'Ctrl+3', run: () => changeMode('dashboard') },
+    { label: 'Mode: Skills', hint: 'Ctrl+4', run: () => changeMode('skills') },
     ...(selected ? [{ label: 'Toggle focus mode', hint: 'F', run: () => setFocusMode((f) => !f) }] : []),
     {
       label: 'Resurface a thought',
@@ -563,7 +580,7 @@ export default function App() {
       </div>
       <TopBar
         mode={mode}
-        onMode={setMode}
+        onMode={changeMode}
         view={view}
         onView={changeView}
         onSearch={() => setOverlay('palette')}
@@ -608,6 +625,34 @@ export default function App() {
           <HoverLayer graph={graph} />
         </>
       )}
+      {mode === 'notes' && (
+        <NotesMode
+          graph={graph}
+          selected={selected}
+          pins={pins}
+          dailyFolder={cfg?.dailyFolder || '06 - Daily Logs'}
+          templates={templates}
+          onOpen={openNote}
+          onClose={() => selectNote(null)}
+          onCreate={handleCreate}
+          onCreateFromTemplate={createFromTemplate}
+          onTogglePin={togglePin}
+          onFlyTo={flyToBrain}
+          readerProps={{
+            graph,
+            clusters,
+            suggestions,
+            onAcceptSuggestion: acceptSuggestion,
+            onDismissSuggestion: dismissSuggestion,
+            onSelect: openNote,
+            onRenamed: handleRenamed,
+            onUsage: (name) => window.onyx.bumpUsage?.(name).then(setUsage),
+            onEditingChange: (d) => {
+              kbRef.current.dirty = d
+            }
+          }}
+        />
+      )}
       {mode === 'dashboard' && (
         <DashboardMode
           graph={graph}
@@ -616,7 +661,7 @@ export default function App() {
           onSelect={openNote}
           onFilter={(f) => {
             setFilter(f)
-            setMode('brain')
+            changeMode('brain')
           }}
           suggestions={suggestions}
           onAcceptSuggestion={acceptSuggestion}
@@ -652,7 +697,7 @@ export default function App() {
           onClose={() => setOverlay(null)}
         />
       )}
-      {selected && (
+      {selected && mode !== 'notes' && (
         <NoteReader
           id={selected}
           graph={graph}

@@ -3,6 +3,7 @@ import { Kbd } from './chrome.jsx'
 
 const MODES = [
   { id: 'brain', label: 'BRAIN' },
+  { id: 'notes', label: 'NOTES' },
   { id: 'dashboard', label: 'DASHBOARD' },
   { id: 'skills', label: 'SKILLS' }
 ]
