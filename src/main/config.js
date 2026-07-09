@@ -6,6 +6,7 @@ import path from 'node:path'
 // vault picker instead of scanning a path that only exists on one machine.
 const DEFAULTS = {
   vaultPath: '',
+  vaults: [], // every vault folder ever opened; vaultPath is the active one
   sizeBy: 'links',
   colorBy: 'folder',
   showAllLinks: true,

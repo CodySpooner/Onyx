@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('onyx', {
   deleteNote: (id) => ipcRenderer.invoke('vault:deleteNote', id),
   renameNote: (id, title) => ipcRenderer.invoke('vault:renameNote', id, title),
   pickVault: () => ipcRenderer.invoke('vault:pickVault'),
+  listVaults: () => ipcRenderer.invoke('vault:list'),
+  switchVault: (path) => ipcRenderer.invoke('vault:switch', path),
   getConfig: () => ipcRenderer.invoke('config:get'),
   setConfig: (patch) => ipcRenderer.invoke('config:set', patch),
   onGraphUpdate: (cb) => {

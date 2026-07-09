@@ -211,10 +211,39 @@ ipcMain.handle('vault:ensureNote', async (_e, rel, content) => {
     return null
   }
 })
+// remember a vault path in the known-vaults list (dedup, cap 24, active first)
+function rememberVault(p) {
+  const { vaults } = loadConfig()
+  const next = [p, ...(vaults || []).filter((v) => v !== p)].slice(0, 24)
+  saveConfig({ vaults: next })
+}
+
 ipcMain.handle('vault:pickVault', async () => {
   const r = await dialog.showOpenDialog(win, { properties: ['openDirectory'] })
   if (r.canceled || !r.filePaths[0]) return cachedGraph
   saveConfig({ vaultPath: r.filePaths[0] })
+  rememberVault(r.filePaths[0])
+  const g = await reindex()
+  watchVault()
+  return g
+})
+
+// known vaults + active, for the vault selector
+ipcMain.handle('vault:list', async () => {
+  const { vaultPath, vaults } = loadConfig()
+  // active path may pre-date the list (upgrades) — fold it in
+  const paths = [...new Set([vaultPath, ...(vaults || [])].filter(Boolean))]
+  return {
+    active: vaultPath || null,
+    vaults: paths.map((p) => ({ path: p, name: path.basename(p) || p }))
+  }
+})
+
+// switch to an already-known vault without the OS dialog
+ipcMain.handle('vault:switch', async (_e, p) => {
+  if (!p || typeof p !== 'string') return cachedGraph
+  saveConfig({ vaultPath: p })
+  rememberVault(p)
   const g = await reindex()
   watchVault()
   return g

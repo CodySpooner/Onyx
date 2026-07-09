@@ -30,10 +30,11 @@ import { insertWikilink, triageQueue } from './lib/suggest.mjs'
 import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
 import { TriageModal } from './components/TriageModal.jsx'
-import { buildWorkspaces, scopeGraph, validateWorkspaceUi } from './lib/workspaces.mjs'
+import { scopeGraph } from './lib/workspaces.mjs'
+import { cleanFolder } from './lib/stats.mjs'
 import { validateSettings, needsRebuild, DEFAULTS as GSET_DEFAULTS } from './lib/graph-settings.mjs'
 import { CustomizeDrawer } from './components/CustomizeDrawer.jsx'
-import { WorkspacePill, WorkspaceModal } from './components/WorkspacePill.jsx'
+import { VaultPill, TopicPill } from './components/ScopeControls.jsx'
 import { FindReplaceModal } from './components/FindReplaceModal.jsx'
 import { NotesMode } from './modes/NotesMode.jsx'
 
@@ -72,11 +73,8 @@ export default function App() {
   const [showCustomize, setShowCustomize] = useState(false)
   const gsetTimer = useRef(null)
   const gsetPendingWrite = useRef(null)
-  const [wsManual, setWsManual] = useState([])
-  const [workspaceId, setWorkspaceId] = useState(null)
-  const [wsModal, setWsModal] = useState(null) // null | 'new' | workspace object
-  const wsLoaded = useRef(false)
-  const [wsStore, setWsStore] = useState(null) // persisted workspace state, once loaded
+  const [topicFolder, setTopicFolder] = useState(null) // active folder scope | null = All Topics
+  const [vaults, setVaults] = useState({ active: null, vaults: [] })
   const [quests, setQuests] = useState(null)
   const [questsLoaded, setQuestsLoaded] = useState(false)
   const lastOpened = useRef(null)
@@ -121,9 +119,7 @@ export default function App() {
       // include build-time keys (theme, gem shape...), rebuild it once
       if (needsRebuild(GSET_DEFAULTS, v, 'brain')) setResetNonce((n) => n + 1)
     })
-    Promise.all([window.onyx.storeGet?.('workspaces'), window.onyx.storeGet?.('workspace-ui')]).then(([w, ui]) => {
-      setWsStore({ manual: w?.manual, activeId: ui?.activeId })
-    })
+    window.onyx.listVaults?.().then(setVaults)
     window.onyx.storeGet?.('quests').then((qs) => {
       setQuests(qs || null)
       setQuestsLoaded(true) // state, not ref: the boot tick must re-run when this lands
@@ -217,58 +213,51 @@ export default function App() {
       setShowAllLinks,
       setShowLabels,
       hover: (id) => bus.emit('hover', { id, x: 620, y: 320, pinned: true }),
-      setWorkspace: (id) => setWorkspaceId(id)
+      setTopic: (id) => setTopicFolder(id)
     }
   }, [])
 
-  // ── project workspaces: scoping is a VIEW over the vault, never a move ──
-  const workspaces = useMemo(() => (graph ? buildWorkspaces(graph, wsManual) : []), [graph, wsManual])
-  const activeWs = workspaces.find((w) => w.id === workspaceId) || null
-  const scoped = useMemo(() => (graph && activeWs ? scopeGraph(graph, activeWs) : graph), [graph, activeWs])
+  // ── topic scope: focusing one folder is a VIEW over the vault, never a move ──
+  // a topic = { folders: [id] }; scopeGraph gives the same clean-slate subgraph
+  // every mode already consumes. Not persisted — boots to All Topics always.
+  const activeTopic = useMemo(() => {
+    if (!graph || !topicFolder) return null
+    const f = graph.folders.find((x) => x.id === topicFolder)
+    return f ? { id: 'topic:' + f.id, name: cleanFolder(f.name), color: f.color, folders: [f.id], tags: [], noteIds: [] } : null
+  }, [graph, topicFolder])
+  const scoped = useMemo(() => (graph && activeTopic ? scopeGraph(graph, activeTopic) : graph), [graph, activeTopic])
 
-  // validate persisted workspace state once the graph exists. wsStore is
-  // state (not a ref) so whichever of graph/store loads last re-runs this —
-  // a ref here silently skipped restore AND disabled persistence for the
-  // whole session when the graph won the boot race
+  // topic folder vanished after a reindex/vault switch → fall back to All
   useEffect(() => {
-    if (!graph || wsLoaded.current || !wsStore) return
-    wsLoaded.current = true
-    const auto = buildWorkspaces(graph, [])
-    const ok = validateWorkspaceUi({ activeId: wsStore.activeId, manual: wsStore.manual }, auto)
-    setWsManual(ok.manual)
-    // manual ids validate against the loaded manual list too
-    const all = new Set([...auto.map((w) => w.id), ...ok.manual.map((w) => w.id)])
-    if (ok.activeId || (wsStore.activeId && all.has(wsStore.activeId))) {
-      setWorkspaceId(wsStore.activeId)
-    }
-  }, [graph, wsStore])
-  // every workspace activation is LOUD — a silently scoped slate (boot
-  // restore OR pill click into a tiny project) reads as "my vault is gone"
-  useEffect(() => {
-    if (!workspaceId || !activeWs || !scoped) return
-    const n = scoped.notes.length
-    bus.emit('toast', { msg: `◈ ${activeWs.name} — ${n} note${n === 1 ? '' : 's'} in scope · ● pill → ALL VAULT` })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceId])
-  // a new slate means a clean slate: folder/tag filters from the previous
-  // scope rarely exist in the next one and would dim everything chip-lessly
+    if (graph && topicFolder && !graph.folders.some((f) => f.id === topicFolder)) setTopicFolder(null)
+  }, [graph, topicFolder])
+  // focusing a folder is LOUD + clears stale filters (a folder chip from the
+  // whole-vault view rarely matches inside a single topic)
   useEffect(() => {
     setFilter(EMPTY_FILTER)
-  }, [workspaceId])
-  // deleted project log → its auto workspace evaporates: fall back loudly
-  useEffect(() => {
-    if (!graph || !wsLoaded.current || !workspaceId) return
-    if (!workspaces.some((w) => w.id === workspaceId)) {
-      setWorkspaceId(null)
-      bus.emit('toast', { msg: '◈ workspace no longer exists — back to ALL VAULT', kind: 'err' })
+    if (topicFolder && graph && activeTopic) {
+      bus.emit('toast', { msg: `◍ ${activeTopic.name} — ${scoped.notes.length} notes · pill → All Topics` })
     }
-  }, [graph, workspaces, workspaceId])
-  useEffect(() => {
-    if (wsLoaded.current) window.onyx.storeSet?.('workspace-ui', { activeId: workspaceId })
-  }, [workspaceId])
-  useEffect(() => {
-    if (wsLoaded.current) window.onyx.storeSet?.('workspaces', { manual: wsManual })
-  }, [wsManual])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topicFolder])
+
+  const switchVault = (path) => {
+    window.onyx.switchVault?.(path).then((g) => {
+      setGraph(g)
+      setTopicFolder(null)
+      setSelected(null)
+      window.onyx.listVaults?.().then(setVaults)
+    })
+  }
+  const openVault = () => {
+    window.onyx.pickVault().then((g) => {
+      setGraph(g)
+      setTopicFolder(null)
+      setSelected(null)
+      window.onyx.getConfig().then(setCfg)
+      window.onyx.listVaults?.().then(setVaults)
+    })
+  }
   const updateGset = (patch) => {
     setGset((prev) => {
       const next = validateSettings({ ...(prev || GSET_DEFAULTS), ...patch })
@@ -290,27 +279,6 @@ export default function App() {
     window.addEventListener('beforeunload', flush)
     return () => window.removeEventListener('beforeunload', flush)
   }, [])
-  const saveWorkspace = (w) => {
-    // enforce the cap BEFORE activating — silently dropping the entry while
-    // activating its id used to fire a bogus "no longer exists" toast
-    const isNew = !wsManual.some((x) => x.id === w.id)
-    if (isNew && wsManual.length >= 20) {
-      bus.emit('toast', { msg: '◈ workspace limit reached (20) — delete one first', kind: 'err' })
-      return
-    }
-    setWsManual((prev) => {
-      const at = prev.findIndex((x) => x.id === w.id)
-      return at >= 0 ? prev.map((x) => (x.id === w.id ? w : x)) : [...prev, w]
-    })
-    setWsModal(null)
-    setWorkspaceId(w.id)
-  }
-  const deleteWorkspace = (id) => {
-    setWsManual((prev) => prev.filter((x) => x.id !== id))
-    if (workspaceId === id) setWorkspaceId(null)
-    setWsModal(null)
-  }
-
 
   // hoisted graph-derived data (computed once per graph)
   const stats = useMemo(() => (scoped ? vaultStats(scoped) : null), [scoped])
@@ -717,8 +685,9 @@ export default function App() {
     { label: 'View: Core of Everything', hint: 'lens', run: () => { changeMode('brain'); changeView('core') } },
     { label: 'View: Second Brain Globe', hint: 'lens', run: () => { changeMode('brain'); changeView('globe') } },
     { label: 'View: Constellation', hint: 'lens', run: () => { changeMode('brain'); changeView('constellation') } },
-    ...(activeWs ? [{ label: 'Workspace: ALL VAULT', hint: 'scope', run: () => setWorkspaceId(null) }] : []),
-    ...workspaces.filter((w) => w.id !== workspaceId).slice(0, 8).map((w) => ({ label: 'Workspace: ' + w.name, hint: 'scope', run: () => setWorkspaceId(w.id) })),
+    ...(topicFolder ? [{ label: 'Topic: All Topics', hint: 'scope', run: () => setTopicFolder(null) }] : []),
+    ...(graph?.folders || []).filter((f) => f.id !== topicFolder).slice(0, 10).map((f) => ({ label: 'Topic: ' + cleanFolder(f.name), hint: 'scope', run: () => setTopicFolder(f.id) })),
+    ...vaults.vaults.filter((v) => v.path !== vaults.active).slice(0, 6).map((v) => ({ label: 'Vault: ' + v.name, hint: 'switch', run: () => switchVault(v.path) })),
     { label: 'Mode: Notes', hint: 'Ctrl+2', run: () => changeMode('notes') },
     { label: 'Mode: Dashboard', hint: 'Ctrl+3', run: () => changeMode('dashboard') },
     { label: 'Mode: Skills', hint: 'Ctrl+4', run: () => changeMode('skills') },
@@ -738,7 +707,7 @@ export default function App() {
     { label: 'Toggle labels', hint: 'labels', run: toggleLabels },
     ...(filtering ? [{ label: 'Clear filters', hint: 'reset', run: () => setFilter(EMPTY_FILTER) }] : []),
     { label: 'Reset camera', hint: 'view', run: () => setResetNonce((n) => n + 1) },
-    { label: 'Change vault…', hint: 'system', run: () => window.onyx.pickVault().then(setGraph) }
+    { label: 'Open vault folder…', hint: 'system', run: openVault }
   ]
 
   return (
@@ -765,13 +734,10 @@ export default function App() {
         mode={mode}
         onMode={changeMode}
         workspacePill={
-          <WorkspacePill
-            workspaces={workspaces}
-            activeId={workspaceId}
-            onPick={setWorkspaceId}
-            onNew={() => setWsModal('new')}
-            onEdit={(w) => setWsModal(w)}
-          />
+          <>
+            <VaultPill vaults={vaults.vaults} active={vaults.active} onSwitch={switchVault} onOpen={openVault} />
+            <TopicPill graph={graph} activeId={topicFolder} onPick={setTopicFolder} />
+          </>
         }
         view={view}
         onView={changeView}
@@ -892,15 +858,6 @@ export default function App() {
       {overlay === 'review' && reviewQueue.length > 0 && (
         <ReviewModal due={reviewQueue} onGrade={handleGrade} onClose={() => setOverlay(null)} />
       )}
-      {wsModal && graph && (
-        <WorkspaceModal
-          graph={graph}
-          initial={wsModal === 'new' ? null : wsModal}
-          onSave={saveWorkspace}
-          onDelete={deleteWorkspace}
-          onClose={() => setWsModal(null)}
-        />
-      )}
       {overlay === 'findreplace' && graph && (
         // full graph on purpose — the modal promises WHOLE VAULT; a scoped
         // scan would silently skip out-of-workspace notes mid-rename
@@ -952,7 +909,7 @@ export default function App() {
         graph={scoped}
         clusterCount={clusters.clusterCount}
         vaultPath={cfg?.vaultPath || ''}
-        onPickVault={() => window.onyx.pickVault().then(setGraph)}
+        onPickVault={openVault}
         onPomodoroDone={() => window.onyx.bumpUsage?.('pomodorosCompleted').then(setUsage)}
       />
       <Toasts />
@@ -964,7 +921,7 @@ export default function App() {
         <div className="empty">
           <h1>◑ Onyx</h1>
           <p>No notes found in this folder.</p>
-          <button onClick={() => window.onyx.pickVault().then(setGraph)}>Choose vault folder</button>
+          <button onClick={openVault}>Choose vault folder</button>
         </div>
       )}
       {(booting || !graph) &&
@@ -973,7 +930,7 @@ export default function App() {
             <div className="empty">
               <h1>◑ Onyx</h1>
               <p>Couldn't open the vault — pick a folder of .md files.</p>
-              <button onClick={() => window.onyx.pickVault().then(setGraph)}>Choose vault folder</button>
+              <button onClick={openVault}>Choose vault folder</button>
             </div>
           </div>
         ) : (
