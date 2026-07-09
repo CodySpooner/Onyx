@@ -25,6 +25,19 @@ function parseSkillMd(file, dirName) {
   return { name, description, blurb: blurb(description) }
 }
 
+// single-skill plugins declare themselves in a root skill.json instead of a
+// skills/<name>/SKILL.md tree (e.g. ui-ux-pro-max) — parse that shape too
+function parseSkillJson(file, fallbackName) {
+  try {
+    const j = JSON.parse(readFileSync(file, 'utf8'))
+    const name = String(j.name || j.displayName || '').trim() || fallbackName
+    const description = String(j.description || '').trim().slice(0, 600)
+    return { name, description, blurb: blurb(description) }
+  } catch {
+    return null // no/invalid skill.json
+  }
+}
+
 function listDirs(dir) {
   // no dirent filtering: skill dirs are often junctions/symlinks on Windows
   // (37 of this machine's 40 are) — the SKILL.md read try/catch is the filter
@@ -52,14 +65,22 @@ export function scanInstalledSkills() {
     for (const plugin of listDirs(path.join(cacheRoot, owner))) {
       const versions = listDirs(path.join(cacheRoot, owner, plugin)).sort(cmpVersion).reverse()
       for (const version of versions) {
-        const skillsDir = path.join(cacheRoot, owner, plugin, version, 'skills')
-        const names = listDirs(skillsDir)
-        if (!names.length) continue // broken/partial cache → try next-highest
-        for (const dir of names) {
-          const parsed = parseSkillMd(path.join(skillsDir, dir, 'SKILL.md'), dir)
-          if (parsed) skills.push({ id: `plugin:${plugin}/${dir}`, ...parsed, source: 'plugin', plugin, owner, version })
+        const verDir = path.join(cacheRoot, owner, plugin, version)
+        const names = listDirs(path.join(verDir, 'skills'))
+        if (names.length) {
+          for (const dir of names) {
+            const parsed = parseSkillMd(path.join(verDir, 'skills', dir, 'SKILL.md'), dir)
+            if (parsed) skills.push({ id: `plugin:${plugin}/${dir}`, ...parsed, source: 'plugin', plugin, owner, version })
+          }
+          break // one version per plugin ever reaches the payload
         }
-        break // one version per plugin ever reaches the payload
+        // no skills/ tree → single-skill plugin (root skill.json or SKILL.md)?
+        const single = parseSkillJson(path.join(verDir, 'skill.json'), plugin) || parseSkillMd(path.join(verDir, 'SKILL.md'), plugin)
+        if (single) {
+          skills.push({ id: 'plugin:' + plugin, ...single, source: 'plugin', plugin, owner, version })
+          break
+        }
+        // commands-only or partial cache → try the next-highest version
       }
     }
   }
