@@ -9,6 +9,9 @@ const CARD_H = 5.6
 const GAP = 2.4
 const BLOCK_GAP = 8
 const MAX_ROW = 150 // board wraps to a new shelf past this width
+// fixed geometry reused across every rebuild (truly shared → never disposed)
+const CARD_GEO = new THREE.PlaneGeometry(CARD_W, CARD_H)
+const BOARD_GEO = new THREE.PlaneGeometry(2000, 2000)
 
 let CORK = null
 function corkTexture() {
@@ -148,7 +151,7 @@ export class CorkboardView {
 
     // cork backdrop
     const board = new THREE.Mesh(
-      new THREE.PlaneGeometry(2000, 2000),
+      BOARD_GEO,
       new THREE.MeshStandardMaterial({ map: corkTexture(), roughness: 0.95 })
     )
     corkTexture().repeat.set(30, 30)
@@ -213,13 +216,13 @@ export class CorkboardView {
       const p = pos.get(n.id)
       const tex = cardTexture(n, p.folderColor)
       const card = new THREE.Mesh(
-        new THREE.PlaneGeometry(CARD_W, CARD_H),
+        CARD_GEO,
         new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85 })
       )
       const tilt = ((hash(n.id) % 100) / 100 - 0.5) * 0.14 // slight pinned-askew
       card.rotation.z = tilt
       card.position.set(p.x, p.y, 0)
-      card.userData = { id: n.id }
+      card.userData = { id: n.id, sharedGeo: true } // CARD_GEO is module-shared
       this.group.add(card)
       const pin = new THREE.Sprite(pinMat)
       pin.scale.set(1.4, 1.4, 1)

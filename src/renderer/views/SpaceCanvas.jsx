@@ -77,5 +77,15 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAll
     inst.current?.setPath?.(pathIds)
   }, [pathIds])
 
+  // the view captures onSelect/onHover once at mount; App re-creates them every
+  // render (they close over live pathMode/pathAnchor), so re-push the current
+  // ones — without this, path mode's click handler stays frozen at first render
+  useEffect(() => {
+    if (inst.current) {
+      inst.current.onSelect = onSelect
+      inst.current.onHover = onHover
+    }
+  })
+
   return <div className="canvas" ref={ref} />
 }

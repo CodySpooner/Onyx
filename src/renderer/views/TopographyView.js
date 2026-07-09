@@ -10,6 +10,8 @@ const N = 128 // terrain grid resolution
 const SPAN = 320 // world size of the terrain plane
 const HEIGHT = 60 // max elevation
 const CONTOUR = 6 // elevation units between contour lines
+// beacon cone reused across rebuilds (truly shared → never disposed)
+const MARK_GEO = new THREE.ConeGeometry(1.5, 5, 6)
 
 const _cA = new THREE.Color()
 const _cB = new THREE.Color()
@@ -192,13 +194,12 @@ export class TopographyView {
     }
 
     // note markers: little glowing beacons planted on the surface
-    const markGeo = new THREE.ConeGeometry(1.5, 5, 6)
     for (const { n, wx, wz } of notePos) {
       const y = sample(wx, wz)
       const ci = clusterOf.get(n.id)
       const hex = ci >= 0 ? CLUSTER_PALETTE[ci % CLUSTER_PALETTE.length] : 0x8fa0b8
       const c = new THREE.Color(hex)
-      const mk = new THREE.Mesh(markGeo, new THREE.MeshStandardMaterial({ color: c.clone().multiplyScalar(0.5), emissive: c, emissiveIntensity: 0.9 }))
+      const mk = new THREE.Mesh(MARK_GEO, new THREE.MeshStandardMaterial({ color: c.clone().multiplyScalar(0.5), emissive: c, emissiveIntensity: 0.9 }))
       mk.position.set(wx, y + 2.5, wz)
       mk.userData = { id: n.id, sharedGeo: true }
       this.group.add(mk)
@@ -326,9 +327,9 @@ export class TopographyView {
   }
 
   _clear() {
+    // maps are the shared softDot() glow + makeLabel cache — never dispose them
     for (const child of [...this.group.children]) {
       this.group.remove(child)
-      child.material?.map?.dispose?.()
       child.material?.dispose()
       if (!child.userData?.sharedGeo) child.geometry?.dispose()
     }

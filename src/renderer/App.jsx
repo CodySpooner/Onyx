@@ -42,6 +42,7 @@ import { NotesMode } from './modes/NotesMode.jsx'
 const skey = (s) => (s.a < s.b ? s.a + '|' + s.b : s.b + '|' + s.a)
 
 const EMPTY_FILTER = { q: '', folders: [], types: [], statuses: [], tags: [] }
+const PATH_VIEWS = new Set(['brain', 'transit', 'corkboard', 'mycelium', 'topography']) // lenses that implement setPath
 
 export default function App() {
   const [graph, setGraph] = useState(null)
@@ -401,7 +402,7 @@ export default function App() {
   // path-finding: in path mode a node click picks the two endpoints instead of
   // opening; the shortest chain then lights up in the graph
   const onNodeSelect = (id) => {
-    if (!pathMode || id == null) return selectNote(id)
+    if (!pathMode || id == null || !PATH_VIEWS.has(view)) return selectNote(id)
     if (!pathAnchor) {
       setPathAnchor(id)
       setPathIds(null)
@@ -825,7 +826,7 @@ export default function App() {
               onReset={() => setResetNonce((n) => n + 1)}
               onTune={() => setShowCustomize((v) => !v)}
               tuneOn={showCustomize}
-              onPath={togglePathMode}
+              onPath={PATH_VIEWS.has(view) ? togglePathMode : null}
               pathOn={pathMode}
             />
             {showCustomize && gset && (

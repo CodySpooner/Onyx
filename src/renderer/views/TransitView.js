@@ -9,6 +9,11 @@ import { paletteFor } from '../lib/graph-settings.mjs'
 const GOLDEN = 2.399963
 const R0 = 16 // first station radius (the plaza stays open)
 const STEP = 11 // spacing between stations along a line
+// fixed-size station geometry, created once and reused across every rebuild
+// (truly shared → never disposed; sharedGeo tag on the meshes is honest)
+const STATION_GEO = new THREE.CircleGeometry(3.4, 20)
+const INTER_GEO = new THREE.CircleGeometry(5.4, 24)
+const RING_GEO = new THREE.RingGeometry(3.4, 5.2, 24)
 
 // Transit Map — the vault as a subway diagram. Each cluster is a colored line
 // fanning out from a central interchange; notes are stations along it; notes
@@ -147,8 +152,6 @@ export class TransitView {
     this.controls.maxDistance = extent * 3
 
     // stations: a note that links outside its own line is an interchange
-    const stationGeo = new THREE.CircleGeometry(3.4, 20)
-    const interGeo = new THREE.CircleGeometry(5.4, 24)
     for (const lm of lineMeta) {
       for (const n of lm.members) {
         const p = pos.get(n.id)
@@ -158,17 +161,17 @@ export class TransitView {
           return o && clusterOf.get(oid) !== clusterOf.get(n.id)
         })
         const mat = new THREE.MeshBasicMaterial({ color: isInter ? 0xffffff : lm.color.getHex() })
-        const disc = new THREE.Mesh(isInter ? interGeo : stationGeo, mat)
+        const disc = new THREE.Mesh(isInter ? INTER_GEO : STATION_GEO, mat)
         disc.rotation.x = -Math.PI / 2
         disc.position.set(p.x, 0.6, p.z)
         disc.userData = { id: n.id, sharedGeo: true }
         this.group.add(disc)
         // colored ring around interchange discs so the line still reads
         if (isInter) {
-          const ring = new THREE.Mesh(new THREE.RingGeometry(3.4, 5.2, 24), new THREE.MeshBasicMaterial({ color: lm.color, side: THREE.DoubleSide }))
+          const ring = new THREE.Mesh(RING_GEO, new THREE.MeshBasicMaterial({ color: lm.color, side: THREE.DoubleSide }))
           ring.rotation.x = -Math.PI / 2
           ring.position.set(p.x, 0.55, p.z)
-          ring.userData = { sharedGeo: false }
+          ring.userData = { sharedGeo: true }
           this.group.add(ring)
         }
         const rec = { id: n.id, disc, base: isInter ? 3.8 : 2.4, active: true, x: p.x, z: p.z, inter: isInter }
@@ -303,7 +306,7 @@ export class TransitView {
   setSettings(s) {
     this.settings = s
     applyCommonSettings(this, s)
-    this.update(this.graph) // palette lives at build time here
+    if (this.graph) this.update(this.graph) // palette lives at build time here
   }
 
   setPaused(p) {
@@ -318,9 +321,10 @@ export class TransitView {
   }
 
   _clear() {
+    // labels use the shared makeLabel cache and there are no per-note textures
+    // here, so never dispose material maps (that would blank other lenses)
     for (const child of [...this.group.children]) {
       this.group.remove(child)
-      child.material?.map?.dispose?.()
       child.material?.dispose()
       if (!child.userData?.sharedGeo) child.geometry?.dispose()
     }

@@ -64,7 +64,7 @@ export function HudToolbar({ showAllLinks, onLinks, showLabels, onLabels, onRese
     <aside className="hud-right glass">
       <TBtn icon="links" on={showAllLinks} onClick={onLinks} title="Toggle links" />
       <TBtn icon="labels" on={showLabels} onClick={onLabels} title="Toggle labels" />
-      <TBtn icon="path" on={pathOn} onClick={onPath} title="Find path between two notes" />
+      {onPath && <TBtn icon="path" on={pathOn} onClick={onPath} title="Find path between two notes" />}
       <TBtn icon="tune" on={tuneOn} onClick={onTune} title="Customize graphs" />
       <TBtn icon="reset" onClick={onReset} title="Reset camera" />
     </aside>

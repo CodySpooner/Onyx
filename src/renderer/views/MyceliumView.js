@@ -11,6 +11,8 @@ import { effective } from '../lib/graph-settings.mjs'
 // sci-fi blues of the other lenses)
 const SPORE = ['#7fe0b0', '#a8e063', '#d6e05a', '#ffd166', '#63d4b0', '#8fd46a']
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+// unit sphere reused across rebuilds (truly shared → never disposed)
+const CORE_GEO = new THREE.SphereGeometry(1, 12, 12)
 
 // Mycelium — the vault as a living root/fungal web. Notes glow where tendrils
 // meet, links grow as filaments, clusters breathe as separate root systems in
@@ -95,7 +97,6 @@ export class MyceliumView {
     this.sim = createSim(ids, graph.links, { repulsion: eff['physics.repulsion'] * 1.1, restLen: 30, maxRadius: 175 })
     this.sim.tick(300)
 
-    const coreGeo = new THREE.SphereGeometry(1, 12, 12)
     for (const n of graph.notes) {
       const sn = this.sim.byId.get(n.id)
       const ci = clusterOf.get(n.id)
@@ -103,7 +104,7 @@ export class MyceliumView {
       const col = new THREE.Color(hex)
       const deg = (n.outLinks?.length || 0) + (n.inLinks?.length || 0)
       const size = clamp(0.8 + deg * 0.16, 0.8, 3.4)
-      const core = new THREE.Mesh(coreGeo, new THREE.MeshStandardMaterial({ color: col.clone().multiplyScalar(0.4), emissive: col, emissiveIntensity: 1.2, roughness: 0.5 }))
+      const core = new THREE.Mesh(CORE_GEO, new THREE.MeshStandardMaterial({ color: col.clone().multiplyScalar(0.4), emissive: col, emissiveIntensity: 1.2, roughness: 0.5 }))
       core.scale.setScalar(size)
       core.position.set(sn.x, sn.y, sn.z)
       core.userData = { id: n.id, sharedGeo: true }
@@ -309,10 +310,11 @@ export class MyceliumView {
   }
 
   _clear() {
+    // maps here are the shared softDot() halo + the makeLabel cache — never
+    // dispose them or other lenses' sprites/labels go blank
     for (const child of [...this.group.children]) {
       if (child === this.spores) continue // spores persist across graph updates
       this.group.remove(child)
-      child.material?.map?.dispose?.()
       child.material?.dispose()
       if (!child.userData?.sharedGeo) child.geometry?.dispose()
     }
