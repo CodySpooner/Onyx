@@ -1,18 +1,19 @@
 import { useEffect, useRef } from 'react'
 import { SolarSystemView } from './SolarSystemView.js'
-import { GraphView } from './GraphView.js'
 import { CoreView } from './CoreView.js'
 import { GlobeView } from './GlobeView.js'
 import { BrainView } from './BrainView.js'
 import { StacksView } from './StacksView.js'
 import { AtlasView } from './AtlasView.js'
-import { ArchiveCityView } from './ArchiveCityView.js'
 import { NexusView } from './NexusView.js'
-import { EcoView } from './EcoView.js'
+import { TransitView } from './TransitView.js'
+import { CorkboardView } from './CorkboardView.js'
+import { MyceliumView } from './MyceliumView.js'
+import { TopographyView } from './TopographyView.js'
 
-const VIEWS = { brain: BrainView, nexus: NexusView, atlas: AtlasView, stacks: StacksView, city: ArchiveCityView, eco: EcoView, solar: SolarSystemView, constellation: GraphView, core: CoreView, globe: GlobeView }
+const VIEWS = { brain: BrainView, nexus: NexusView, atlas: AtlasView, stacks: StacksView, transit: TransitView, corkboard: CorkboardView, mycelium: MyceliumView, topography: TopographyView, solar: SolarSystemView, core: CoreView, globe: GlobeView }
 
-export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0, paused = false, focus = null, settings = null, dueCount = 0 }) {
+export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAllLinks = true, showLabels = false, resetNonce = 0, paused = false, focus = null, settings = null, dueCount = 0, pathIds = null }) {
   const ref = useRef(null)
   const inst = useRef(null)
   const settingsRef = useRef(settings)
@@ -71,6 +72,10 @@ export function SpaceCanvas({ view, graph, activeIds, onSelect, onHover, showAll
   useEffect(() => {
     inst.current?.setDue?.(dueCount)
   }, [dueCount])
+
+  useEffect(() => {
+    inst.current?.setPath?.(pathIds)
+  }, [pathIds])
 
   return <div className="canvas" ref={ref} />
 }

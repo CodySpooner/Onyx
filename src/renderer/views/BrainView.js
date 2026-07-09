@@ -92,6 +92,10 @@ export class BrainView {
     const prevIds = new Set(this.byId.keys()) // stagger only NEW notes — saves must not replay the show
     let newCount = 0
     this._clear()
+    // node records are about to be rebuilt — drop any path refs to old orbs
+    this.pathIds = null
+    this.pathSet = null
+    this.pathPairs = []
 
     const ids = graph.notes.map((n) => n.id)
     const { clusterOf } = detectClusters(ids, graph.links)
@@ -150,6 +154,16 @@ export class BrainView {
     this.pulses = new LinkPulses(this.group, this.segArray, paletteFor(this.settings).pulse, Math.round(90 * effective(this.settings)['motion.pulses']))
 
     // hover highlight overlay (incident links only)
+    // path-finding overlay: the shortest chain between two notes, gold + bright
+    this.pathGeo = new THREE.BufferGeometry()
+    this.pathGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3))
+    this.pathLines = new THREE.LineSegments(
+      this.pathGeo,
+      new THREE.LineBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+    )
+    this.pathLines.visible = false
+    this.group.add(this.pathLines)
+
     this.hlGeo = new THREE.BufferGeometry()
     this.hlGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3))
     this.hlLines = new THREE.LineSegments(
@@ -164,12 +178,53 @@ export class BrainView {
 
   setActive(idSet) {
     this.activeIds = idSet
+    this._applyDim()
+  }
+
+  // dim rule: a live path wins (only its notes lit); else the active filter
+  _applyDim() {
+    const path = this.pathSet
     for (const n of this.nodes) {
-      const on = !idSet || idSet.has(n.id)
+      const on = path ? path.has(n.id) : !this.activeIds || this.activeIds.has(n.id)
       n.active = on
       n.mesh.material.transparent = !on
-      n.mesh.material.opacity = on ? 1 : 0.12
+      n.mesh.material.opacity = on ? 1 : path ? 0.05 : 0.12
       n.mesh.material.emissiveIntensity = on ? 0.9 : 0.25
+    }
+  }
+
+  // public: highlight the shortest chain between two notes (path lens)
+  setPath(ids) {
+    this.pathIds = Array.isArray(ids) && ids.length ? ids : null
+    this.pathSet = this.pathIds ? new Set(this.pathIds) : null
+    this.pathPairs = []
+    if (this.pathIds) {
+      for (let i = 0; i < this.pathIds.length - 1; i++) {
+        const a = this.byId.get(this.pathIds[i])
+        const b = this.byId.get(this.pathIds[i + 1])
+        if (a && b) this.pathPairs.push([a, b])
+      }
+      this._frameNodes(this.pathIds)
+    }
+    if (this.pathLines) this.pathLines.visible = !!this.pathPairs.length
+    this._applyDim()
+  }
+
+  // ease the camera to frame a set of nodes (fit their bounding sphere)
+  _frameNodes(ids) {
+    const pts = ids.map((id) => this.byId.get(id)?.mesh.position).filter(Boolean)
+    if (!pts.length) return
+    const c = new THREE.Vector3()
+    for (const p of pts) c.add(p)
+    c.multiplyScalar(1 / pts.length)
+    let r = 0
+    for (const p of pts) r = Math.max(r, p.distanceTo(c))
+    const dist = Math.max(60, r * 2.4 + 40)
+    this._flight = {
+      from: this.camera.position.clone(),
+      to: new THREE.Vector3(c.x, c.y + dist * 0.3, c.z + dist),
+      look: c.clone(),
+      t: 0
     }
   }
 
@@ -390,6 +445,16 @@ export class BrainView {
         this.segArray[i++] = b.mesh.position.z
       }
       if (this.lines) this.lines.geometry.attributes.position.needsUpdate = true
+    }
+    // path overlay follows the moving nodes; gentle pulse so it reads as active
+    if (this.pathPairs && this.pathPairs.length && this.pathGeo) {
+      const seg = []
+      for (const [a, b] of this.pathPairs) {
+        seg.push(a.mesh.position.x, a.mesh.position.y, a.mesh.position.z, b.mesh.position.x, b.mesh.position.y, b.mesh.position.z)
+      }
+      this.pathGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(seg), 3))
+      this.pathGeo.attributes.position.needsUpdate = true
+      this.pathLines.material.opacity = 0.7 + Math.sin(this._t * 3) * 0.25
     }
     if (this.hoverId) this._rebuildHighlight()
     if (this.pulses) this.pulses.update(dt)

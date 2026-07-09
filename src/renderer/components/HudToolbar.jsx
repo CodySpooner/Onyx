@@ -36,6 +36,16 @@ const ICONS = {
       strokeLinecap="round"
       strokeLinejoin="round"
     />
+  ),
+  path: (
+    <path
+      d="M6 18a3 3 0 100-6 3 3 0 000 6zM18 12a3 3 0 100-6 3 3 0 000 6zM8.5 15.5l7-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   )
 }
 
@@ -49,11 +59,12 @@ function TBtn({ icon, on, onClick, title }) {
   )
 }
 
-export function HudToolbar({ showAllLinks, onLinks, showLabels, onLabels, onReset, onTune, tuneOn = false }) {
+export function HudToolbar({ showAllLinks, onLinks, showLabels, onLabels, onReset, onTune, tuneOn = false, onPath, pathOn = false }) {
   return (
     <aside className="hud-right glass">
       <TBtn icon="links" on={showAllLinks} onClick={onLinks} title="Toggle links" />
       <TBtn icon="labels" on={showLabels} onClick={onLabels} title="Toggle labels" />
+      <TBtn icon="path" on={pathOn} onClick={onPath} title="Find path between two notes" />
       <TBtn icon="tune" on={tuneOn} onClick={onTune} title="Customize graphs" />
       <TBtn icon="reset" onClick={onReset} title="Reset camera" />
     </aside>

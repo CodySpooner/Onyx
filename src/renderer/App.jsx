@@ -31,6 +31,7 @@ import { toggleTask } from './lib/tasks.mjs'
 import { TrailStrip } from './components/TrailStrip.jsx'
 import { TriageModal } from './components/TriageModal.jsx'
 import { scopeGraph } from './lib/workspaces.mjs'
+import { shortestPath } from './lib/pathfind.mjs'
 import { cleanFolder } from './lib/stats.mjs'
 import { validateSettings, needsRebuild, DEFAULTS as GSET_DEFAULTS } from './lib/graph-settings.mjs'
 import { CustomizeDrawer } from './components/CustomizeDrawer.jsx'
@@ -75,6 +76,9 @@ export default function App() {
   const gsetPendingWrite = useRef(null)
   const [topicFolder, setTopicFolder] = useState(null) // active folder scope | null = All Topics
   const [vaults, setVaults] = useState({ active: null, vaults: [] })
+  const [pathMode, setPathMode] = useState(false) // click two notes → trace their link path
+  const [pathAnchor, setPathAnchor] = useState(null) // first endpoint, awaiting the second
+  const [pathIds, setPathIds] = useState(null) // resolved path node ids, highlighted in the lens
   const [quests, setQuests] = useState(null)
   const [questsLoaded, setQuestsLoaded] = useState(false)
   const lastOpened = useRef(null)
@@ -213,7 +217,8 @@ export default function App() {
       setShowAllLinks,
       setShowLabels,
       hover: (id) => bus.emit('hover', { id, x: 620, y: 320, pinned: true }),
-      setTopic: (id) => setTopicFolder(id)
+      setTopic: (id) => setTopicFolder(id),
+      setPathIds: (ids) => setPathIds(ids)
     }
   }, [])
 
@@ -240,6 +245,14 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topicFolder])
+
+  // path-finding is a brain-lens interaction; drop it when the lens/mode/graph
+  // changes so a stale path can't linger over rebuilt or unrelated nodes
+  useEffect(() => {
+    setPathMode(false)
+    setPathAnchor(null)
+    setPathIds(null)
+  }, [view, mode, graph])
 
   const switchVault = (path) => {
     window.onyx.switchVault?.(path).then((g) => {
@@ -383,6 +396,36 @@ export default function App() {
     if (id == null) setFocusMode(false) // closing the reader always exits focus
     setSelected(id)
     if (id) setTrail((t) => pushTrail(t, id, Date.now()))
+  }
+
+  // path-finding: in path mode a node click picks the two endpoints instead of
+  // opening; the shortest chain then lights up in the graph
+  const onNodeSelect = (id) => {
+    if (!pathMode || id == null) return selectNote(id)
+    if (!pathAnchor) {
+      setPathAnchor(id)
+      setPathIds(null)
+      bus.emit('toast', { msg: '⤳ path: now click the destination note' })
+      return
+    }
+    const r = shortestPath(scoped.links, pathAnchor, id)
+    if (r && r.ids.length > 1) {
+      setPathIds(r.ids)
+      bus.emit('toast', { msg: `⤳ path found — ${r.ids.length} notes, ${r.edges.length} hops` })
+    } else {
+      setPathIds(null)
+      bus.emit('toast', { msg: '⤳ no link path between those two notes', kind: 'err' })
+    }
+    setPathAnchor(null)
+  }
+  const togglePathMode = () => {
+    setPathMode((on) => {
+      const next = !on
+      setPathAnchor(null)
+      setPathIds(null)
+      bus.emit('toast', { msg: next ? '⤳ path mode — click the starting note' : '⤳ path mode off' })
+      return next
+    })
   }
 
   const toggleLinks = () => {
@@ -679,12 +722,13 @@ export default function App() {
     { label: 'View: Nexus Core', hint: 'lens', run: () => { changeMode('brain'); changeView('nexus') } },
     { label: 'View: Atlas', hint: 'lens', run: () => { changeMode('brain'); changeView('atlas') } },
     { label: 'View: Stacks', hint: 'lens', run: () => { changeMode('brain'); changeView('stacks') } },
-    { label: 'View: Archive City', hint: 'lens', run: () => { changeMode('brain'); changeView('city') } },
-    { label: 'View: Ecosystem', hint: 'lens', run: () => { changeMode('brain'); changeView('eco') } },
+    { label: 'View: Transit Map', hint: 'lens', run: () => { changeMode('brain'); changeView('transit') } },
+    { label: 'View: Corkboard', hint: 'lens', run: () => { changeMode('brain'); changeView('corkboard') } },
+    { label: 'View: Mycelium', hint: 'lens', run: () => { changeMode('brain'); changeView('mycelium') } },
+    { label: 'View: Topography', hint: 'lens', run: () => { changeMode('brain'); changeView('topography') } },
     { label: 'View: Solar System', hint: 'lens', run: () => { changeMode('brain'); changeView('solar') } },
     { label: 'View: Core of Everything', hint: 'lens', run: () => { changeMode('brain'); changeView('core') } },
     { label: 'View: Second Brain Globe', hint: 'lens', run: () => { changeMode('brain'); changeView('globe') } },
-    { label: 'View: Constellation', hint: 'lens', run: () => { changeMode('brain'); changeView('constellation') } },
     ...(topicFolder ? [{ label: 'Topic: All Topics', hint: 'scope', run: () => setTopicFolder(null) }] : []),
     ...(graph?.folders || []).filter((f) => f.id !== topicFolder).slice(0, 10).map((f) => ({ label: 'Topic: ' + cleanFolder(f.name), hint: 'scope', run: () => setTopicFolder(f.id) })),
     ...vaults.vaults.filter((v) => v.path !== vaults.active).slice(0, 6).map((v) => ({ label: 'Vault: ' + v.name, hint: 'switch', run: () => switchVault(v.path) })),
@@ -719,7 +763,7 @@ export default function App() {
           view={view}
           graph={scoped}
           activeIds={filtering ? activeIds : null}
-          onSelect={selectNote}
+          onSelect={onNodeSelect}
           onHover={(h) => bus.emit('hover', h)}
           showAllLinks={showAllLinks}
           showLabels={showLabels}
@@ -728,6 +772,7 @@ export default function App() {
           focus={flyTo}
           settings={gset}
           dueCount={due.length}
+          pathIds={pathIds}
         />
       </div>
       <TopBar
@@ -780,6 +825,8 @@ export default function App() {
               onReset={() => setResetNonce((n) => n + 1)}
               onTune={() => setShowCustomize((v) => !v)}
               tuneOn={showCustomize}
+              onPath={togglePathMode}
+              pathOn={pathMode}
             />
             {showCustomize && gset && (
               // gated on gset: interacting before the store loads would

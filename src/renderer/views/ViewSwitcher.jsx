@@ -4,12 +4,13 @@ const VIEWS = [
   { id: 'nexus', label: '❖ Nexus Core' },
   { id: 'atlas', label: '◈ Atlas' },
   { id: 'stacks', label: '▤ Stacks' },
-  { id: 'city', label: '▙ Archive City' },
-  { id: 'eco', label: '⌂ Ecosystem' },
+  { id: 'transit', label: '⊟ Transit Map' },
+  { id: 'corkboard', label: '▦ Corkboard' },
+  { id: 'mycelium', label: '❦ Mycelium' },
+  { id: 'topography', label: '◭ Topography' },
   { id: 'solar', label: '☀ Solar System' },
   { id: 'core', label: '◉ Core of Everything' },
-  { id: 'globe', label: '⊕ Second Brain' },
-  { id: 'constellation', label: '✦ Constellation' }
+  { id: 'globe', label: '⊕ Second Brain' }
 ]
 
 export function ViewSwitcher({ view, onChange }) {
